@@ -15,7 +15,11 @@ import jakarta.servlet.http.*;
  */
 @WebServlet({"/login", "/register", "/logout"})
 public class AuthController extends HttpServlet {
-    private final UserDao userDao = new UserDao();
+    /**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+	private final UserDao userDao = new UserDao();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {

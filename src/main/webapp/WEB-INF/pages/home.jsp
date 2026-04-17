@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
     pageEncoding="UTF-8"%>
+    <%@ page import="com.nex.model.User" %>
 <!DOCTYPE html>
 
 <html class="dark" lang="en"><head>
@@ -87,6 +88,7 @@
     </style>
 </head>
 <body class="overflow-x-hidden selection:bg-primary selection:text-on-primary">
+
 <!-- Top Navigation -->
 <nav class="sticky top-0 w-full z-50 bg-slate-950/60 backdrop-blur-xl shadow-2xl shadow-black/40">
 <div class="max-w-7xl mx-auto flex justify-between items-center px-8 py-4">

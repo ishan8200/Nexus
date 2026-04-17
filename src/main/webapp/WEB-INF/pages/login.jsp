@@ -129,12 +129,12 @@
 </div>
 <!-- Card Section -->
 <div class="glass-panel rounded-xl p-10 shadow-2xl shadow-black/40 border border-white/5 relative z-10">
-<form class="space-y-6">
+<form class="space-y-6" method="post">
 <!-- Email Field -->
 <div class="space-y-2">
-<label class="block text-xs font-semibold uppercase tracking-widest text-on-surface-variant ml-1" for="email">Email Address</label>
+<label class="block text-xs font-semibold uppercase tracking-widest text-on-surface-variant ml-1" for="email">username</label>
 <div class="relative group">
-<input class="w-full bg-surface-container-low border-0 outline-none rounded-lg px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-2 focus:ring-primary/20 transition-all duration-300" id="email" placeholder="name@company.com" type="email"/>
+<input class="w-full bg-surface-container-low border-0 outline-none rounded-lg px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-2 focus:ring-primary/20 transition-all duration-300" name="username" placeholder="username" type="text"/>
 <div class="absolute inset-0 border border-outline-variant/15 rounded-lg pointer-events-none group-focus-within:border-primary/50 transition-colors"></div>
 </div>
 </div>
@@ -145,7 +145,7 @@
 <a class="text-xs font-semibold text-primary hover:text-primary-fixed-dim transition-colors" href="#">Forgot password?</a>
 </div>
 <div class="relative group">
-<input class="w-full bg-surface-container-low border-0 outline-none rounded-lg px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-2 focus:ring-primary/20 transition-all duration-300" id="password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" type="password"/>
+<input class="w-full bg-surface-container-low border-0 outline-none rounded-lg px-4 py-4 text-on-surface placeholder:text-outline/40 focus:ring-2 focus:ring-primary/20 transition-all duration-300" id="password" name="password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" type="password"/>
 <div class="absolute inset-0 border border-outline-variant/15 rounded-lg pointer-events-none group-focus-within:border-primary/50 transition-colors"></div>
 </div>
 </div>

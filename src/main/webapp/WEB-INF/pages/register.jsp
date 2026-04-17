@@ -159,7 +159,7 @@
 <h2 class="font-headline text-3xl font-bold text-on-surface tracking-tight mb-2">Create Account</h2>
 <p class="text-on-surface-variant">Join the next generation of professional talent.</p>
 </div>
-<form class="space-y-6">
+<form class="space-y-6" action="register" method="post">
 <!-- Role Selection: Custom Premium Toggle -->
 <div class="space-y-3">
 <label class="text-sm font-semibold text-on-surface-variant tracking-wide px-1">SELECT YOUR ROLE</label>
@@ -181,18 +181,18 @@
 </div>
 <!-- Name Field -->
 <div class="space-y-2">
-<label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1" for="full_name">Full Name</label>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1" for="username">Username</label>
 <div class="relative group">
 <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">person</span>
-<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="full_name" placeholder="Johnathan Sterling" type="text"/>
+<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="username" name="username" placeholder="ishan" type="text"/>
 </div>
 </div>
 <!-- Email Field -->
 <div class="space-y-2">
-<label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1" for="email_address">Corporate Email</label>
+<label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1" for="email_address">Email</label>
 <div class="relative group">
 <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">alternate_email</span>
-<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="email_address" placeholder="name@nexus.sovereign" type="email"/>
+<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="email" name="email" placeholder="email@gmail.com" type="email"/>
 </div>
 </div>
 <!-- Password Field -->
@@ -200,7 +200,7 @@
 <label class="text-xs font-bold text-on-surface-variant uppercase tracking-widest px-1" for="password">Security Key</label>
 <div class="relative group">
 <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">lock</span>
-<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-12 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="password" placeholder="••••••••••••" type="password"/>
+<input class="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg py-3.5 pl-12 pr-12 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" id="password" name="password" placeholder="••••••••••••" type="password"/>
 <button class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface" type="button">
 <span class="material-symbols-outlined">visibility</span>
 </button>

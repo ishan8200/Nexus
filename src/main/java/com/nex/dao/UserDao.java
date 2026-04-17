@@ -16,7 +16,7 @@ public class UserDao {
      * Uses BCrypt to hash the password before saving for security.
      */
     public boolean registerUser(User user) {
-        String query = "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)";
+        String query = "INSERT INTO users (username, password, email, role, dateAdded) VALUES (?, ?, ?, ?, NOW())";
         // Hashing the password with a salt
         String hashedPassword = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
         
@@ -26,7 +26,7 @@ public class UserDao {
             pstmt.setString(1, user.getUsername());
             pstmt.setString(2, hashedPassword); // Store the hashed password
             pstmt.setString(3, user.getEmail());
-            //pstmt.setString(4, user.getRole());
+            pstmt.setString(4, user.getRole());
             
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
