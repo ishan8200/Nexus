@@ -21,12 +21,16 @@ public class WorkerController extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private TaskDAO taskDAO;
     private UserDAO userDAO;
+    private com.nex.dao.NotificationDAO notificationDAO;
+    private com.nex.dao.SkillDAO skillDAO;
     
     @Override
     public void init() throws ServletException {
         super.init();
         taskDAO = new TaskDAO();
         userDAO = new UserDAO();
+        notificationDAO = new com.nex.dao.NotificationDAO();
+        skillDAO = new com.nex.dao.SkillDAO();
     }
     
     @Override
@@ -52,6 +56,10 @@ public class WorkerController extends HttpServlet {
         List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks();
         List<Map<String, Object>> myTasks = userDAO.getMyTasks(currentUser.getId());
         List<Map<String, Object>> earningsHistory = userDAO.getWorkerEarnings(currentUser.getId());
+        List<Map<String, Object>> notifications = notificationDAO.getNotificationsForUser(currentUser.getId());
+        List<Map<String, Object>> allSkills = skillDAO.getAllSkills();
+        List<Map<String, Object>> workerSkills = skillDAO.getWorkerSkills(currentUser.getId());
+        List<Map<String, Object>> performance = taskDAO.getCompletedTasksWithRatings(currentUser.getId());
         
         request.setAttribute("totalEarned", stats.get("total_earned"));
         request.setAttribute("tasksCompleted", stats.get("tasks_completed"));
@@ -60,6 +68,10 @@ public class WorkerController extends HttpServlet {
         request.setAttribute("availableTasks", availableTasks);
         request.setAttribute("myTasks", myTasks);
         request.setAttribute("earningsHistory", earningsHistory);
+        request.setAttribute("notifications", notifications);
+        request.setAttribute("allSkills", allSkills);
+        request.setAttribute("workerSkills", workerSkills);
+        request.setAttribute("performance", performance);
         request.setAttribute("currentUser", currentUser);
         
         request.getRequestDispatcher("/WEB-INF/pages/workerDash.jsp").forward(request, response);

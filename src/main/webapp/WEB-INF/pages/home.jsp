@@ -590,7 +590,6 @@
             <div class="btn-group">
                 <% if (currentUser == null) { %>
                     <a href="${pageContext.request.contextPath}/register" class="btn btn-primary">GET STARTED →</a>
-                    <a href="#features" class="btn btn-secondary">VIEW DEMO</a>
                 <% } else if ("admin".equals(currentUser.getRole())) { %>
                     <a href="${pageContext.request.contextPath}/admin" class="btn btn-primary">GO TO DASHBOARD →</a>
                 <% } else { %>

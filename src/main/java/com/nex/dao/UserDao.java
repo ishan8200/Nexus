@@ -142,11 +142,11 @@ public class UserDAO {
     
     public List<Map<String, Object>> getAllWorkersWithStats() {
         List<Map<String, Object>> workers = new ArrayList<>();
-        String sql = "SELECT u.*, COUNT(DISTINCT t.id) as tasks_completed_count " +
+        String sql = "SELECT u.*, v.assigned_tasks, v.submissions_made, v.avg_rating " +
                      "FROM users u " +
-                     "LEFT JOIN tasks t ON t.assigned_to = u.id AND t.status = 'completed' " +
+                     "JOIN worker_performance_view v ON u.id = v.worker_id " +
                      "WHERE u.role = 'worker' " +
-                     "GROUP BY u.id ORDER BY u.created_at DESC";
+                     "ORDER BY u.full_name ASC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
@@ -161,8 +161,11 @@ public class UserDAO {
                 worker.put("status", rs.getString("status"));
                 worker.put("skills", rs.getString("skills"));
                 worker.put("rating", rs.getDouble("rating"));
+                worker.put("avg_rating", rs.getDouble("avg_rating"));
                 worker.put("total_earned", rs.getDouble("total_earned"));
-                worker.put("tasks_completed", rs.getInt("tasks_completed_count"));
+                worker.put("tasks_completed", rs.getInt("tasks_completed"));
+                worker.put("assigned_tasks", rs.getInt("assigned_tasks"));
+                worker.put("submissions_made", rs.getInt("submissions_made"));
                 worker.put("created_at", rs.getTimestamp("created_at"));
                 workers.add(worker);
             }
@@ -224,6 +227,18 @@ public class UserDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, status);
             pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    public boolean deleteUser(int userId) {
+        String sql = "DELETE FROM users WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -330,6 +345,19 @@ public class UserDAO {
             e.printStackTrace();
         }
         return tasks;
+    }
+    
+    public boolean updateUserRating(int userId, double rating) {
+        String sql = "UPDATE users SET rating = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, rating);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
     
     // ==================== HELPER METHODS ====================

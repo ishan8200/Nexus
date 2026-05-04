@@ -33,7 +33,7 @@
                     ⌘
                 </div>
                 <h1>Create your account</h1>
-                <p>Join Nexus Works as an Employer or Worker</p>
+                <p>Join Nexus Works as an Admin or Worker</p>
             </div>
 
             <div class="register-card">
@@ -99,10 +99,10 @@
                         <label class="form-label">I want to join as *</label>
                         <div class="role-selector">
                             <label class="role-card">
-                                <input type="radio" name="role" value="employer" required>
+                                <input type="radio" name="role" value="admin" required>
                                 <div class="role-content">
                                     <span class="role-icon">🏢</span>
-                                    <span class="role-title">Employer</span>
+                                    <span class="role-title">Admin</span>
                                     <span class="role-desc">Post tasks, manage workers, track progress</span>
                                 </div>
                             </label>
@@ -233,7 +233,7 @@
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('alertContainer', 'Valid email required', 'error'); e.preventDefault(); return; }
             if (password.length < 6 || !/\d/.test(password)) { showAlert('alertContainer', 'Password: 6+ chars with number', 'error'); e.preventDefault(); return; }
             if (password !== confirmPassword) { showAlert('alertContainer', 'Passwords do not match', 'error'); e.preventDefault(); return; }
-            if (!role) { showAlert('alertContainer', 'Select role (employer/worker)', 'error'); e.preventDefault(); return; }
+            if (!role) { showAlert('alertContainer', 'Select role (admin/worker)', 'error'); e.preventDefault(); return; }
             if (!termsCheckbox) { showAlert('alertContainer', 'Accept terms required', 'error'); e.preventDefault(); return; }
 
             // All good - show loading, submit to server /register servlet

@@ -95,6 +95,30 @@
         .submission-worker { font-weight: 700; font-size: 16px; }
         .submission-date { font-size: 12px; color: var(--text-muted); }
         .submission-body { font-size: 14px; margin-bottom: 15px; color: var(--text-secondary); }
+
+        /* Interactive Rating Stars */
+        .rating-stars {
+            display: flex;
+            gap: 2px;
+            cursor: pointer;
+        }
+        .star {
+            font-size: 18px;
+            color: var(--nexus-border);
+            transition: all 0.2s ease;
+        }
+        .star.active {
+            color: var(--nexus-accent);
+        }
+        .star:hover, .star:hover ~ .star {
+            color: var(--nexus-accent-glow);
+        }
+        .rating-stars:hover .star {
+            color: var(--nexus-accent);
+        }
+        .star:hover ~ .star {
+            color: var(--nexus-border) !important;
+        }
     </style>
 </head>
 <body>
@@ -259,7 +283,7 @@
                         <div class="admin-card-body" style="padding: 0;">
                             <table class="admin-table">
                                 <thead>
-                                    <tr><th>Type</th><th>Name</th><th>Date</th></tr>
+                                    <tr><th>Type</th><th>Name</th><th>Date</th><th>Action</th></tr>
                                 </thead>
                                 <tbody>
                                     <% for (Map<String, Object> submission : pendingSubmissionsList) { %>
@@ -267,17 +291,23 @@
                                         <td><span class="status-badge pending">Submission</span></td>
                                         <td><strong><%= submission.get("worker_name") %></strong></td>
                                         <td style="font-size: 11px;"><%= submission.get("submitted_at") %></td>
+                                        <td>
+                                            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveSubmission(<%= submission.get("id") %>, this)">Approve</button>
+                                        </td>
                                     </tr>
                                     <% } %>
                                     <% for (Map<String, Object> worker : pendingWorkersList) { %>
                                     <tr>
-                                        <td><span class="status-badge approved">Registration</span></td>
+                                        <td><span class="status-badge pending">Registration</span></td>
                                         <td><strong><%= worker.get("full_name") %></strong></td>
                                         <td style="font-size: 11px;"><%= worker.get("created_at") %></td>
+                                        <td>
+                                            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveWorker(<%= worker.get("id") %>, this)">Approve</button>
+                                        </td>
                                     </tr>
                                     <% } %>
                                     <% if (pendingSubmissionsList.isEmpty() && pendingWorkersList.isEmpty()) { %>
-                                    <tr><td colspan="3" style="text-align: center; padding: 30px; color: var(--text-muted);">Clear for now.</td></tr>
+                                    <tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">Clear for now.</td></tr>
                                     <% } %>
                                 </tbody>
                             </table>
@@ -295,7 +325,7 @@
                     <div class="admin-card-body" style="padding: 0;">
                         <table class="admin-table">
                             <thead>
-                                <tr><th>Task Title</th><th>Priority</th><th>Status</th><th>Wage</th><th>Deadline</th></tr>
+                                <tr><th>Task Title</th><th>Priority</th><th>Status</th><th>Wage</th><th>Deadline</th><th>Action</th></tr>
                             </thead>
                             <tbody>
                                 <% if (allTasks != null) { %>
@@ -306,6 +336,9 @@
                                             <td><span class="status-badge <%= ((String)task.get("status")).toLowerCase().replace(" ", "-") %>"><%= task.get("status") %></span></td>
                                             <td style="font-family: 'JetBrains Mono'; font-weight: 700;"><%= cur.format(task.get("wage")) %></td>
                                             <td><%= task.get("deadline") %></td>
+                                            <td>
+                                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="deleteTask(<%= task.get("id") %>, this)">Delete</button>
+                                            </td>
                                         </tr>
                                     <% } %>
                                 <% } %>
@@ -384,14 +417,31 @@
                                 <tr>
                                     <td><strong><%= worker.get("full_name") %></strong><br><small style="color: var(--text-muted);"><%= worker.get("email") %></small></td>
                                     <td><%= worker.get("tasks_completed") %></td>
-                                    <td style="font-weight: 700; color: var(--nexus-accent);"><%= String.format("%.1f", worker.get("rating")) %> ★</td>
+                                    <td>
+                                        <div class="rating-stars" data-worker-id="<%= worker.get("id") %>">
+                                            <% 
+                                                double currentRating = (double) worker.get("rating");
+                                                for(int i = 1; i <= 5; i++) { 
+                                            %>
+                                                <span class="star <%= i <= currentRating ? "active" : "" %>" onclick="rateWorker(<%= worker.get("id") %>, <%= i %>, this)">★</span>
+                                            <% } %>
+                                        </div>
+                                    </td>
                                     <td style="font-family: 'JetBrains Mono';"><%= cur.format(worker.get("total_earned")) %></td>
                                     <td><span class="status-badge <%= ((String)worker.get("status")).toLowerCase() %>"><%= worker.get("status") %></span></td>
                                     <td>
                                         <% if ("pending".equals(worker.get("status"))) { %>
-                                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;">Approve</button>
+                                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="approveWorker(<%= worker.get("id") %>, this)">Approve</button>
                                         <% } else { %>
-                                            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;">Manage</button>
+                                            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" 
+                                                onclick="manageWorker(<%= worker.get("id") %>, '<%= worker.get("status") %>', this)"
+                                                data-name="<%= worker.get("full_name") %>"
+                                                data-email="<%= worker.get("email") %>"
+                                                data-phone="<%= worker.get("phone") != null ? worker.get("phone") : "N/A" %>"
+                                                data-skills="<%= worker.get("skills") != null ? worker.get("skills") : "No skills listed" %>"
+                                                data-rating="<%= String.format("%.1f", worker.get("rating")) %>"
+                                                data-earned="<%= cur.format(worker.get("total_earned")) %>"
+                                                data-tasks="<%= worker.get("tasks_completed") %>">Manage</button>
                                         <% } %>
                                     </td>
                                 </tr>
@@ -423,8 +473,8 @@
                                 <strong>Notes:</strong> <%= submission.get("submission_text") %>
                             </div>
                             <div style="display: flex; gap: 10px;">
-                                <button class="btn btn-primary" style="padding: 8px 16px;">Approve</button>
-                                <button class="btn btn-secondary" style="padding: 8px 16px;">Reject</button>
+                                <button class="btn btn-primary" style="padding: 8px 16px;" onclick="approveSubmission(<%= submission.get("id") %>, this)">Approve</button>
+                                <button class="btn btn-secondary" style="padding: 8px 16px;" onclick="rejectSubmission(<%= submission.get("id") %>, this)">Reject</button>
                             </div>
                         </div>
                         <% } %>
@@ -453,7 +503,8 @@
                                     <td><%= wage.get("tasks_completed") %></td>
                                     <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--nexus-success);"><%= cur.format(wage.get("total_earned")) %></td>
                                     <td>
-                                        <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px;">Audit Details</button>
+                                        <button class="btn btn-primary" style="padding: 4px 12px; font-size: 12px;" onclick="markAsPaid(<%= wage.get("worker_id") %>, this)">Pay Worker</button>
+                                        <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px;">Audit</button>
                                     </td>
                                 </tr>
                                 <% } %>
@@ -485,6 +536,50 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Worker Management Modal -->
+    <div id="workerModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="modalWorkerName">Worker Details</h3>
+                <button class="modal-close" onclick="closeWorkerModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="worker-details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label class="form-label">Email Address</label>
+                        <p id="modalWorkerEmail" style="margin-bottom: 15px; font-weight: 500;"></p>
+                        
+                        <label class="form-label">Phone Number</label>
+                        <p id="modalWorkerPhone" style="margin-bottom: 15px; font-weight: 500;"></p>
+                        
+                        <label class="form-label">Status</label>
+                        <p style="margin-bottom: 15px;"><span id="modalWorkerStatus" class="status-badge"></span></p>
+                    </div>
+                    <div>
+                        <label class="form-label">Total Earned</label>
+                        <p id="modalWorkerEarned" style="margin-bottom: 15px; font-weight: 700; color: var(--nexus-success); font-family: 'JetBrains Mono';"></p>
+                        
+                        <label class="form-label">Tasks Completed</label>
+                        <p id="modalWorkerTasks" style="margin-bottom: 15px; font-weight: 500;"></p>
+                        
+                        <label class="form-label">Performance Rating</label>
+                        <p id="modalWorkerRating" style="margin-bottom: 15px; font-weight: 700; color: var(--nexus-accent);"></p>
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <label class="form-label">Core Skills</label>
+                    <p id="modalWorkerSkills" style="padding: 10px; background: var(--nexus-surface); border: 1px solid var(--nexus-border); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); min-height: 60px;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <input type="hidden" id="modalWorkerId">
+                <button type="button" class="btn btn-secondary" onclick="closeWorkerModal()">Close</button>
+                <button type="button" id="btnReject" class="btn btn-outline" style="color: var(--nexus-danger); border-color: var(--nexus-danger);" onclick="rejectWorker()">Reject/Block</button>
+                <button type="button" class="btn btn-primary" style="background: var(--nexus-danger); border-color: var(--nexus-danger);" onclick="deleteWorker()">Delete Permanently</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -552,7 +647,7 @@
             }
             const toast = document.createElement('div');
             toast.className = `alert alert-${type}`;
-            toast.innerHTML = `<span>${type === 'success' ? '✓' : 'ℹ️'}</span><span>${message}</span>`;
+            toast.innerHTML = `<span>\${type === 'success' ? '✓' : 'ℹ️'}</span><span>\${message}</span>`;
             container.appendChild(toast);
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
         }
@@ -621,6 +716,138 @@
                   }
               });
         }
+
+        function deleteTask(id, btn) {
+            if (!confirm('Are you sure you want to delete this mission? This cannot be undone.')) return;
+            fetch('${pageContext.request.contextPath}/DeleteTaskServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'taskId=' + id
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast('Mission deleted successfully', 'success');
+                      btn.closest('tr').remove();
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              });
+        }
+
+        function auditWage(workerId) {
+            alert('Opening financial audit for worker ID: ' + workerId + '\nThis feature will display a detailed breakdown of all tasks and payouts in a modal.');
+            // Implementation for a real audit modal can go here
+        }
+
+        // --- Worker Management Modal Functions ---
+
+        function manageWorker(id, status, btn) {
+            document.getElementById('modalWorkerId').value = id;
+            document.getElementById('modalWorkerName').textContent = btn.getAttribute('data-name');
+            document.getElementById('modalWorkerEmail').textContent = btn.getAttribute('data-email');
+            document.getElementById('modalWorkerPhone').textContent = btn.getAttribute('data-phone');
+            document.getElementById('modalWorkerSkills').textContent = btn.getAttribute('data-skills');
+            document.getElementById('modalWorkerRating').textContent = btn.getAttribute('data-rating') + ' ★';
+            document.getElementById('modalWorkerEarned').textContent = btn.getAttribute('data-earned');
+            document.getElementById('modalWorkerTasks').textContent = btn.getAttribute('data-tasks') + ' missions';
+            
+            const statusBadge = document.getElementById('modalWorkerStatus');
+            statusBadge.textContent = status;
+            statusBadge.className = 'status-badge ' + status.toLowerCase();
+            
+            const btnReject = document.getElementById('btnReject');
+            if (status === 'blocked') {
+                btnReject.textContent = 'Unblock Worker';
+                btnReject.style.color = '#059669'; // success color
+                btnReject.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                btnReject.onclick = function() { updateWorkerStatus(id, 'approved'); };
+            } else {
+                btnReject.textContent = 'Block Worker';
+                btnReject.style.color = '#dc2626'; // danger color
+                btnReject.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                btnReject.onclick = function() { updateWorkerStatus(id, 'blocked'); };
+            }
+            
+            document.getElementById('workerModal').classList.add('active');
+        }
+
+        function closeWorkerModal() {
+            document.getElementById('workerModal').classList.remove('active');
+        }
+
+        function updateWorkerStatus(id, newStatus) {
+            const actionText = newStatus === 'blocked' ? 'block' : 'unblock';
+            if (!confirm(`Are you sure you want to \${actionText} this worker?`)) return;
+            
+            fetch('${pageContext.request.contextPath}/ManageWorkerServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'workerId=' + id + '&status=' + newStatus
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast(result.message, 'success');
+                      setTimeout(() => location.reload(), 1000);
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
+        function rateWorker(workerId, rating, starElem) {
+            fetch('${pageContext.request.contextPath}/RateWorkerServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'workerId=' + workerId + '&rating=' + rating
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast('Worker rated: ' + rating + ' stars', 'success');
+                      // Update stars UI
+                      const container = starElem.parentElement;
+                      const stars = container.querySelectorAll('.star');
+                      stars.forEach((s, index) => {
+                          if (index < rating) {
+                              s.classList.add('active');
+                          } else {
+                              s.classList.remove('active');
+                          }
+                      });
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
+        function deleteWorker() {
+            const id = document.getElementById('modalWorkerId').value;
+            if (!confirm('PERMANENT DELETE: This will remove all history for this worker. Proceed?')) return;
+            
+            fetch('${pageContext.request.contextPath}/DeleteWorkerServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'workerId=' + id
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast(result.message, 'success');
+                      setTimeout(() => location.reload(), 1000);
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
+        // Handle URL parameters for alerts
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('success')) {
+                showAlert('alertContainer', urlParams.get('success'), 'success');
+            }
+            if (urlParams.has('error')) {
+                showAlert('alertContainer', urlParams.get('error'), 'error');
+            }
+        };
     </script>
 </body>
 </html>

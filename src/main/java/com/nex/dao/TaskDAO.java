@@ -141,14 +141,56 @@ public class TaskDAO {
     }
     
     public boolean deleteTask(int taskId) {
-        String sql = "DELETE FROM tasks WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, taskId);
-            return pstmt.executeUpdate() > 0;
+        // We need to delete dependent records first to avoid foreign key violations
+        String deleteWagesSql = "DELETE FROM wages WHERE task_id = ?";
+        String deleteSubmissionsSql = "DELETE FROM task_submissions WHERE task_id = ?";
+        String deleteTaskSql = "DELETE FROM tasks WHERE id = ?";
+        
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false); // Start transaction
+            
+            // 1. Delete associated wages
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteWagesSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.executeUpdate();
+            }
+            
+            // 2. Delete associated submissions
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteSubmissionsSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.executeUpdate();
+            }
+            
+            // 3. Delete the task
+            int rowsDeleted = 0;
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteTaskSql)) {
+                pstmt.setInt(1, taskId);
+                rowsDeleted = pstmt.executeUpdate();
+            }
+            
+            conn.commit(); // Commit transaction
+            return rowsDeleted > 0;
+            
         } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
     
@@ -232,6 +274,78 @@ public class TaskDAO {
         }
     }
     
+    public boolean processSubmissionApproval(int submissionId, int reviewedBy, int rating, String comment) {
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Get submission details (task_id, worker_id, and the current wage for that task)
+            int taskId = -1;
+            int workerId = -1;
+            double wage = 0;
+            String getSubSql = "SELECT ts.task_id, ts.worker_id, t.wage FROM task_submissions ts JOIN tasks t ON ts.task_id = t.id WHERE ts.id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(getSubSql)) {
+                pstmt.setInt(1, submissionId);
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    taskId = rs.getInt("task_id");
+                    workerId = rs.getInt("worker_id");
+                    wage = rs.getDouble("wage");
+                } else {
+                    return false;
+                }
+            }
+
+            // 2. Update submission status
+            String updateSubSql = "UPDATE task_submissions SET status = 'approved', rating = ?, admin_comment = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateSubSql)) {
+                pstmt.setInt(1, rating);
+                pstmt.setString(2, comment);
+                pstmt.setInt(3, reviewedBy);
+                pstmt.setInt(4, submissionId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Update task status to completed
+            String updateTaskSql = "UPDATE tasks SET status = 'completed' WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateTaskSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Create wage record (credited to worker, but pending disbursement)
+            String createWageSql = "INSERT INTO wages (worker_id, task_id, submission_id, amount, status) VALUES (?, ?, ?, ?, 'pending')";
+            try (PreparedStatement pstmt = conn.prepareStatement(createWageSql)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setInt(2, taskId);
+                pstmt.setInt(3, submissionId);
+                pstmt.setDouble(4, wage);
+                pstmt.executeUpdate();
+            }
+            
+            // 5. Update worker profile statistics
+            String updateWorkerSql = "UPDATE users SET tasks_completed = tasks_completed + 1 WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateWorkerSql)) {
+                pstmt.setInt(1, workerId);
+                pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
+            e.printStackTrace();
+            return false;
+        } finally {
+            if (conn != null) {
+                try { conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
+        }
+    }
+
     public boolean approveSubmission(int submissionId, int reviewedBy, int rating, String comment) {
         String sql = "UPDATE task_submissions SET status = 'approved', rating = ?, admin_comment = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -427,5 +541,31 @@ public List<Map<String, Object>> getWorkerRatings(int workerId) {
         e.printStackTrace();
     }
     return ratings;
-}
-}
+    }
+
+    public List<Map<String, Object>> getCompletedTasksWithRatings(int workerId) {
+    List<Map<String, Object>> performance = new ArrayList<>();
+    String sql = "SELECT t.title, t.wage, t.status as task_status, ts.rating, ts.rating_comment, ts.reviewed_at " +
+                 "FROM tasks t " +
+                 "JOIN task_submissions ts ON t.id = ts.task_id " +
+                 "WHERE ts.worker_id = ? AND t.status = 'completed' AND ts.status = 'approved' " +
+                 "ORDER BY ts.reviewed_at DESC";
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        pstmt.setInt(1, workerId);
+        ResultSet rs = pstmt.executeQuery();
+        while (rs.next()) {
+            Map<String, Object> record = new HashMap<>();
+            record.put("title", rs.getString("title"));
+            record.put("wage", rs.getDouble("wage"));
+            record.put("rating", rs.getInt("rating"));
+            record.put("comment", rs.getString("rating_comment"));
+            record.put("date", rs.getTimestamp("reviewed_at"));
+            performance.add(record);
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
+    return performance;
+    }
+    }

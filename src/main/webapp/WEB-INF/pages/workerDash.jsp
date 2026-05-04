@@ -11,6 +11,9 @@
     List<Map<String, Object>> availableTasks = (List<Map<String, Object>>) request.getAttribute("availableTasks");
     List<Map<String, Object>> myTasks = (List<Map<String, Object>>) request.getAttribute("myTasks");
     List<Map<String, Object>> earningsHistory = (List<Map<String, Object>>) request.getAttribute("earningsHistory");
+    List<Map<String, Object>> allSkills = (List<Map<String, Object>>) request.getAttribute("allSkills");
+    List<Map<String, Object>> workerSkills = (List<Map<String, Object>>) request.getAttribute("workerSkills");
+    List<Map<String, Object>> performance = (List<Map<String, Object>>) request.getAttribute("performance");
     
     // Stats
     Double totalEarned = (Double) request.getAttribute("totalEarned");
@@ -173,6 +176,17 @@
                     <span class="nav-icon">📊</span>
                     <span class="nav-text">Dashboard</span>
                 </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('notifications')">
+                    <span class="nav-icon">🔔</span>
+                    <span class="nav-text">Notifications</span>
+                    <% 
+                        List<Map<String, Object>> notifs = (List<Map<String, Object>>) request.getAttribute("notifications");
+                        long unreadCount = notifs != null ? notifs.stream().filter(n -> !(boolean)n.get("is_read")).count() : 0;
+                        if (unreadCount > 0) {
+                    %>
+                    <span class="nav-badge"><%= unreadCount %></span>
+                    <% } %>
+                </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('available-tasks')">
                     <span class="nav-icon">🔍</span>
                     <span class="nav-text">Available Tasks</span>
@@ -182,6 +196,15 @@
                     <span class="nav-icon">📋</span>
                     <span class="nav-text">My Tasks</span>
                     <span class="nav-badge"><%= myTasks != null ? myTasks.size() : 0 %></span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-performance')">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">My Performance</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-skills')">
+                    <span class="nav-icon">🛠️</span>
+                    <span class="nav-text">My Skills</span>
+                    <span class="nav-badge"><%= workerSkills != null ? workerSkills.size() : 0 %></span>
                 </a>
                 
                 <div class="nav-section-title">FINANCES</div>
@@ -335,7 +358,10 @@
                                     <div style="font-size: 12px; color: var(--text-muted);">
                                         📅 Deadline: <%= task.get("deadline") %>
                                     </div>
-                                    <button class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
+                                    <form action="${pageContext.request.contextPath}/accept-task" method="POST" style="margin: 0;">
+                                        <input type="hidden" name="taskId" value="<%= task.get("id") %>">
+                                        <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
+                                    </form>
                                 </div>
                             </div>
                         <% } %>
@@ -390,6 +416,132 @@
                                 <% } %>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Performance View -->
+            <div id="my-performanceView" class="page-section">
+                <div class="admin-card">
+                    <div class="admin-card-header">
+                        <h3>📈 Task Performance & Ratings</h3>
+                    </div>
+                    <div class="admin-card-body" style="padding: 0;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Task Title</th>
+                                    <th>Completion Date</th>
+                                    <th>Wage Earned</th>
+                                    <th>Rating</th>
+                                    <th>Feedback</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (performance != null && !performance.isEmpty()) { %>
+                                    <% for (Map<String, Object> record : performance) { %>
+                                        <tr>
+                                            <td style="font-weight: 600;"><%= record.get("title") %></td>
+                                            <td><%= record.get("date") %></td>
+                                            <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--nexus-success);">
+                                                <%= cur.format(record.get("wage")) %>
+                                            </td>
+                                            <td>
+                                                <div style="color: var(--nexus-warning); font-size: 16px;">
+                                                    <% 
+                                                        int stars = (int) record.get("rating");
+                                                        for(int i=0; i<5; i++) {
+                                                    %>
+                                                        <%= i < stars ? "★" : "☆" %>
+                                                    <% } %>
+                                                </div>
+                                            </td>
+                                            <td style="font-size: 13px; color: var(--text-secondary); font-style: italic;">
+                                                "<%= record.get("comment") != null ? record.get("comment") : "No feedback provided." %>"
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; padding: 50px; color: var(--text-muted);">No completed tasks found in your history.</td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Skills View -->
+            <div id="mySkillsView" class="page-section">
+                <div class="grid-2">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3>🛠️ Manage My Skills</h3>
+                        </div>
+                        <div class="admin-card-body">
+                            <form action="${pageContext.request.contextPath}/manage-skills" method="POST">
+                                <input type="hidden" name="action" value="add">
+                                <div class="form-group">
+                                    <label class="form-label">Select Skill</label>
+                                    <select name="skillId" class="input-field">
+                                        <option value="">-- Choose a skill --</option>
+                                        <% if (allSkills != null) { 
+                                            for (Map<String, Object> skill : allSkills) { %>
+                                                <option value="<%= skill.get("id") %>"><%= skill.get("skill_name") %></option>
+                                            <% } 
+                                        } %>
+                                    </select>
+                                </div>
+                                <div style="text-align: center; margin: 15px 0; color: var(--text-muted); font-size: 12px; font-weight: 600;">OR ADD NEW</div>
+                                <div class="form-group">
+                                    <label class="form-label">Other Skill</label>
+                                    <input type="text" name="otherSkill" class="input-field" placeholder="Enter custom skill name...">
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">Proficiency Level</label>
+                                    <select name="proficiency" class="input-field">
+                                        <option value="1">Beginner</option>
+                                        <option value="2">Intermediate</option>
+                                        <option value="3">Advanced</option>
+                                        <option value="4">Expert</option>
+                                        <option value="5">Master</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px;">Add Skill to Portfolio</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3>📜 Current Skillset</h3>
+                        </div>
+                        <div class="admin-card-body">
+                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                                <% if (workerSkills != null && !workerSkills.isEmpty()) { 
+                                    String[] levels = {"", "Beginner", "Intermediate", "Advanced", "Expert", "Master"};
+                                    for (Map<String, Object> skill : workerSkills) { 
+                                        int pLevel = (int) skill.get("proficiency_level");
+                                        String levelLabel = pLevel >= 1 && pLevel <= 5 ? levels[pLevel] : "Novice";
+                                %>
+                                        <div style="background: var(--nexus-accent-light); border: 1px solid var(--nexus-accent); border-radius: 20px; padding: 5px 15px; display: flex; align-items: center; gap: 8px;">
+                                            <div style="display: flex; flex-direction: column;">
+                                                <span style="font-size: 13px; font-weight: 600; color: var(--nexus-accent);"><%= skill.get("skill_name") %></span>
+                                                <span style="font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;"><%= levelLabel %></span>
+                                            </div>
+                                            <form action="${pageContext.request.contextPath}/manage-skills" method="POST" style="margin: 0; display: flex;">
+                                                <input type="hidden" name="action" value="remove">
+                                                <input type="hidden" name="skillId" value="<%= skill.get("id") %>">
+                                                <button type="submit" style="background: none; border: none; color: var(--nexus-danger); cursor: pointer; font-size: 16px; padding: 0; display: flex; align-items: center;">×</button>
+                                            </form>
+                                        </div>
+                                    <% } 
+                                } else { %>
+                                    <p style="color: var(--text-muted); padding: 20px; text-align: center; width: 100%;">You haven't added any skills yet.</p>
+                                <% } %>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -477,6 +629,37 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Notifications View -->
+            <div id="notificationsView" class="page-section">
+                <div class="admin-card" style="max-width: 800px; margin: 0 auto;">
+                    <div class="admin-card-header">
+                        <h3>🔔 Operational Alerts</h3>
+                    </div>
+                    <div class="admin-card-body">
+                        <% if (notifs != null && !notifs.isEmpty()) { %>
+                            <% for (Map<String, Object> n : notifs) { %>
+                                <div class="notification-item" style="padding: 15px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px; background: <%= (boolean)n.get("is_read") ? "transparent" : "rgba(59, 130, 246, 0.03)" %>;">
+                                    <div class="notification-icon" style="font-size: 20px;">
+                                        <%= "success".equals(n.get("type")) ? "✅" : ("warning".equals(n.get("type")) ? "⚠️" : "ℹ️") %>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <h4 style="font-weight: 700; margin-bottom: 3px;"><%= n.get("title") %></h4>
+                                            <span style="font-size: 11px; color: var(--text-muted);"><%= n.get("created_at") %></span>
+                                        </div>
+                                        <p style="font-size: 13px; color: var(--text-secondary);"><%= n.get("message") %></p>
+                                    </div>
+                                </div>
+                            <% } %>
+                        <% } else { %>
+                            <div style="padding: 60px; text-align: center; color: var(--text-muted);">
+                                No alerts in your transmission log.
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -507,16 +690,22 @@
             // Update page titles
             const titles = {
                 'dashboard': 'Worker Dashboard',
+                'notifications': 'Operational Alerts',
                 'available-tasks': 'Available Tasks',
                 'my-tasks': 'Assigned Deliverables',
+                'my-performance': 'Task Performance & Ratings',
+                'my-skills': 'My Professional Skills',
                 'earnings': 'Earnings History',
                 'profile': 'My Professional Profile'
             };
             
             const subtitles = {
                 'dashboard': 'Welcome back, <%= currentUser.getFullName().split(" ")[0] %>! Track your tasks and performance.',
+                'notifications': 'Important updates regarding your submissions and account status.',
                 'available-tasks': 'Discover new high-velocity contracts tailored to your expertise.',
                 'my-tasks': 'Manage and submit your currently assigned project nodes.',
+                'my-performance': 'Review your past accomplishments and employer feedback.',
+                'my-skills': 'Curate your technical portfolio and specialized capabilities.',
                 'earnings': 'Direct oversight of your financial throughput and project payouts.',
                 'profile': 'Configure your professional data and security protocols.'
             };
