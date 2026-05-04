@@ -1,9 +1,10 @@
 package com.nex.controllers;
 
+import java.io.IOException;
+
 import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.*;
-import java.io.IOException;
 
 /**
  * AuthFilter intercepts all requests directed to protected resources like /home.

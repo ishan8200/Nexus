@@ -1,333 +1,826 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8"
-    pageEncoding="UTF-8"%>
-    <%@ page import="com.nex.model.User" %>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="com.nex.model.User" %>
+<%
+    // Check if user is logged in
+    HttpSession sessionObj = request.getSession(false);
+    User currentUser = (sessionObj != null) ? (User) sessionObj.getAttribute("user") : null;
+%>
+	
 <!DOCTYPE html>
-
-<html class="dark" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Nexus | The Sovereign Workspace</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "surface-dim": "#0b1326",
-                        "on-secondary-fixed-variant": "#005236",
-                        "on-surface": "#dae2fd",
-                        "secondary-fixed-dim": "#4edea3",
-                        "on-background": "#dae2fd",
-                        "surface-variant": "#2d3449",
-                        "on-secondary-container": "#00311f",
-                        "secondary": "#4edea3",
-                        "surface-container": "#171f33",
-                        "tertiary-fixed": "#ffddb8",
-                        "background": "#0b1326",
-                        "on-tertiary-fixed": "#2a1700",
-                        "error": "#ffb4ab",
-                        "tertiary": "#ffb95f",
-                        "on-error-container": "#ffdad6",
-                        "on-secondary-fixed": "#002113",
-                        "on-error": "#690005",
-                        "surface-container-low": "#131b2e",
-                        "surface": "#0b1326",
-                        "inverse-surface": "#dae2fd",
-                        "surface-tint": "#7bd0ff",
-                        "primary-container": "#001a27",
-                        "on-tertiary": "#472a00",
-                        "surface-container-high": "#222a3d",
-                        "on-secondary": "#003824",
-                        "on-primary-fixed": "#001e2c",
-                        "secondary-container": "#00a572",
-                        "on-primary": "#00354a",
-                        "outline": "#909097",
-                        "error-container": "#93000a",
-                        "inverse-on-surface": "#283044",
-                        "surface-container-lowest": "#060e20",
-                        "primary-fixed-dim": "#7bd0ff",
-                        "outline-variant": "#45464d",
-                        "inverse-primary": "#00668a",
-                        "on-primary-fixed-variant": "#004c69",
-                        "on-tertiary-fixed-variant": "#653e00",
-                        "primary": "#7bd0ff",
-                        "on-primary-container": "#008abb",
-                        "surface-container-highest": "#2d3449",
-                        "on-surface-variant": "#c6c6cd",
-                        "primary-fixed": "#c4e7ff",
-                        "secondary-fixed": "#6ffbbe",
-                        "surface-bright": "#31394d",
-                        "tertiary-container": "#251400",
-                        "tertiary-fixed-dim": "#ffb95f",
-                        "on-tertiary-container": "#b47300"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.25rem",
-                        "lg": "1rem",
-                        "xl": "1.25rem",
-                        "full": "9999px"
-                    },
-                    "fontFamily": {
-                        "headline": ["Manrope"],
-                        "body": ["Inter"],
-                        "label": ["Inter"]
-                    }
-                }
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Works | Next-Gen Operational Platform</title>
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Home page additional styles */
+        .hero {
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            padding: 80px 0;
+            position: relative;
+        }
+        
+        .hero-content {
+            max-width: 800px;
+        }
+        
+        .hero-badge {
+            display: inline-block;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 6px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #3b82f6;
+            margin-bottom: 24px;
+            letter-spacing: 0.02em;
+        }
+        
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            line-height: 1.2;
+            background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 24px;
+        }
+        
+        .hero p {
+            font-size: 1.25rem;
+            color: #4a4a4a;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+        
+        .section {
+            padding: 80px 0;
+            border-bottom: 1px solid #e2e2dc;
+        }
+        
+        .section:last-child {
+            border-bottom: none;
+        }
+        
+        .section h2 {
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .section h2::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, transparent);
+            border-radius: 6px;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 32px;
+            margin: 48px 0;
+        }
+        
+        .card {
+            background: #fafaf8;
+            border: 1px solid #e2e2dc;
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            border-color: #cbd5e1;
+            transform: translateY(-4px);
+            box-shadow: 0 20px 35px -15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 16px;
+        }
+        
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+        
+        .card p {
+            color: #4a4a4a;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-top: 16px;
+        }
+        
+        .feature-list li {
+            color: #4a4a4a;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .feature-list li::before {
+            content: '▹';
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            font-weight: 600;
+            font-size: 0.9375rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border-color: #60a5fa;
+            box-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            border-color: #e2e2dc;
+            color: #1a1a1a;
+        }
+        
+        .btn-secondary:hover {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .btn-outline:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .architectural-section {
+            background: linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.03) 100%);
+        }
+        
+        .architectural-content {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .architectural-text {
+            font-size: 1.125rem;
+            color: #4a4a4a;
+            margin: 32px 0;
+            line-height: 1.7;
+        }
+        
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            margin: 48px 0;
+        }
+        
+        .media-card {
+            background: #fafaf8;
+            border: 1px solid #e2e2dc;
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .media-card:hover {
+            transform: translateY(-4px);
+            border-color: #cbd5e1;
+        }
+        
+        .media-placeholder {
+            background: linear-gradient(135deg, #ffffff 0%, #fafaf8 100%);
+            aspect-ratio: 16 / 9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #e2e2dc;
+        }
+        
+        .video-badge::before {
+            content: '▶';
+            color: #3b82f6;
+            margin-right: 8px;
+        }
+        
+        .map-badge::before {
+            content: '📍';
+            margin-right: 8px;
+        }
+        
+        .chart-badge::before {
+            content: '📊';
+            margin-right: 8px;
+        }
+        
+        .video-badge, .map-badge, .chart-badge {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            color: #4a4a4a;
+        }
+        
+        .media-caption {
+            padding: 16px;
+            color: #4a4a4a;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+        
+        .tutorial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 32px;
+            margin-top: 32px;
+        }
+        
+        .tutorial-item {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            border-left: 3px solid #3b82f6;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        
+        .tutorial-item:hover {
+            background: #fafaf8;
+            transform: translateX(5px);
+        }
+        
+        .tutorial-item h4 {
+            margin-bottom: 8px;
+            font-size: 1.125rem;
+            color: #1a1a1a;
+        }
+        
+        .tutorial-item p {
+            color: #7a7a7a;
+            font-size: 0.875rem;
+        }
+        
+        .nodes-container {
+            background: #fafaf8;
+            border-radius: 16px;
+            border: 1px solid #e2e2dc;
+            padding: 32px;
+            margin-top: 16px;
+        }
+        
+        .node-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #e2e2dc;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .node-row:last-child {
+            border-bottom: none;
+        }
+        
+        .node-location {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1a1a1a;
+        }
+        
+        .node-location::before {
+            content: '●';
+            color: #3b82f6;
+            font-size: 0.75rem;
+        }
+        
+        .latency {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            color: #4a4a4a;
+            background: #ffffff;
+            padding: 4px 12px;
+            border-radius: 8px;
+        }
+        
+        .latency-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        
+        .metrics-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+            margin-top: 16px;
+        }
+        
+        .metric-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e2e2dc;
+            transition: all 0.15s ease;
+        }
+        
+        .metric-card:hover {
+            border-color: #cbd5e1;
+            transform: translateY(-2px);
+        }
+        
+        .metric-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #7a7a7a;
+            margin-bottom: 8px;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, #1a1a1a, #4a4a4a);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        
+        .metric-trend {
+            font-size: 0.75rem;
+            color: #10b981;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        footer {
+            background: #fafaf8;
+            border-top: 1px solid #e2e2dc;
+            padding: 48px 0;
+            margin-top: 80px;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+            color: #7a7a7a;
+            font-size: 0.875rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+        
+        .footer-links a {
+            color: #7a7a7a;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        
+        .footer-links a:hover {
+            color: #3b82f6;
+        }
+        
+        @media (max-width: 768px) {
+            .section {
+                padding: 48px 0;
+            }
+            .hero {
+                text-align: center;
+            }
+            .hero-content {
+                margin: 0 auto;
+            }
+            .btn-group {
+                justify-content: center;
+            }
+            .section h2::after {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            .section h2 {
+                text-align: center;
+                display: block;
+            }
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+            .media-grid {
+                grid-template-columns: 1fr;
+            }
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
             }
         }
-    </script>
-<style>
-        body { background-color: #0b1326; color: #dae2fd; font-family: 'Inter', sans-serif; }
-        .glass-panel { background: rgba(45, 52, 73, 0.6); backdrop-filter: blur(24px); }
-        .nexus-gradient { background: linear-gradient(135deg, #7bd0ff 0%, #008abb 100%); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+        
+        .section-subtitle {
+            color: #4a4a4a;
+            margin-bottom: 32px;
+            max-width: 600px;
+        }
+        
+        /* Welcome banner for logged in users */
+        .welcome-banner {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border-radius: 16px;
+            padding: 24px 32px;
+            margin-bottom: 48px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            color: white;
+        }
+        
+        .welcome-banner h2 {
+            color: white;
+            margin-bottom: 8px;
+        }
+        
+        .welcome-banner h2::after {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .welcome-banner p {
+            opacity: 0.9;
+        }
+        
+        .dashboard-link {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-link:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
     </style>
 </head>
-<body class="overflow-x-hidden selection:bg-primary selection:text-on-primary">
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="${pageContext.request.contextPath}/" class="logo">
+                <span class="logo-mark">⌘</span>
+                <span class="logo-text">NEXUS</span>
+            </a>
+            <div class="nav-links">
+                <a href="${pageContext.request.contextPath}/" class="active">Home</a>
+                <a href="#">Platform</a>
+                <a href="#">Documentation</a>
+                <% if (currentUser != null) { %>
+                    <% if ("admin".equals(currentUser.getRole())) { %>
+                        <a href="${pageContext.request.contextPath}/admin" class="btn-login-nav">Dashboard</a>
+                    <% } else { %>
+                        <a href="${pageContext.request.contextPath}/worker" class="btn-login-nav">Dashboard</a>
+                    <% } %>
+                    <a href="${pageContext.request.contextPath}/logout" class="btn-login-nav">Logout</a>
+                <% } else { %>
+                    <a href="${pageContext.request.contextPath}/login" class="btn-login-nav">Login</a>
+                <% } %>
+            </div>
+        </div>
+    </nav>
 
-<!-- Top Navigation -->
-<nav class="sticky top-0 w-full z-50 bg-slate-950/60 backdrop-blur-xl shadow-2xl shadow-black/40">
-<div class="max-w-7xl mx-auto flex justify-between items-center px-8 py-4">
-<div class="text-xl font-extrabold tracking-tighter text-white">Nexus</div>
-<div class="hidden md:flex items-center gap-8 font-manrope tracking-tight font-bold text-sm">
-<a class="text-slate-400 hover:text-white transition-colors" href="#">Find Work</a>
-<a class="text-slate-400 hover:text-white transition-colors" href="#">Hire Talent</a>
-<a class="text-slate-400 hover:text-white transition-colors" href="#">How it Works</a>
-<a class="text-slate-400 hover:text-white transition-colors" href="#">Pricing</a>
-</div>
-<div class="flex items-center gap-4">
-<a href="${pageContext.request.contextPath}/register">
-<button class="text-slate-400 hover:text-white transition-colors font-manrope font-bold text-sm">Sign In</button>
-</a>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container hero-content">
+            <span class="hero-badge">v3.0 — STRUCTURAL RELEASE</span>
+            <h1>NEXT-GEN OPERATIONAL NEXUS FOR MODERN TEAMS</h1>
+            <p>A raw, structural platform designed for high-velocity project management. No fluff, just pure architectural logic for builders.</p>
+            <div class="btn-group">
+                <% if (currentUser == null) { %>
+                    <a href="${pageContext.request.contextPath}/register" class="btn btn-primary">GET STARTED →</a>
+                    <a href="#features" class="btn btn-secondary">VIEW DEMO</a>
+                <% } else if ("admin".equals(currentUser.getRole())) { %>
+                    <a href="${pageContext.request.contextPath}/admin" class="btn btn-primary">GO TO DASHBOARD →</a>
+                <% } else { %>
+                    <a href="${pageContext.request.contextPath}/worker" class="btn btn-primary">GO TO DASHBOARD →</a>
+                <% } %>
+            </div>
+        </div>
+    </section>
 
-<a href="${pageContext.request.contextPath}/login">
-    <button class="nexus-gradient px-6 py-2 rounded-full font-manrope font-bold text-sm text-white active:scale-95 transition-transform">Get Started</button>
-</a>
-</div>
-</div>
-</nav>
-<!-- Hero Section -->
-<header class="relative pt-24 pb-32 overflow-hidden px-8">
-<div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-<div class="relative z-10">
-<h1 class="text-6xl md:text-7xl font-headline font-extrabold tracking-tighter text-white leading-[1.1] mb-8">
-                    The Sovereign Workspace for the <span class="text-primary-fixed-dim">Modern Elite</span>
-</h1>
-<p class="text-lg md:text-xl text-on-surface-variant font-body leading-relaxed mb-10 max-w-xl">
-                    Experience the ultimate task marketplace designed for high-performance teams and independent experts. Manage micro-tasks with atomic precision and absolute financial transparency.
-                </p>
-<div class="flex flex-wrap gap-4">
-<button class="nexus-gradient px-8 py-4 rounded-full font-manrope font-bold text-white shadow-xl shadow-primary/20 hover:brightness-110 transition-all">Get Started</button>
-<button class="bg-surface-container-high hover:bg-surface-container-highest px-8 py-4 rounded-full font-manrope font-bold text-white transition-all flex items-center gap-2">
-<span class="material-symbols-outlined text-primary-fixed-dim">play_circle</span>
-                        Watch Demo
-                    </button>
-</div>
-</div>
-<div class="relative lg:h-[600px] flex items-center justify-center">
-<div class="absolute inset-0 bg-primary/10 blur-[120px] rounded-full"></div>
-<img alt="Workflow Connectivity" class="relative w-full h-full object-contain drop-shadow-2xl" data-alt="Futuristic abstract 3D nodes interconnected by glowing light paths on a dark obsidian background representing global connectivity and data flow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsZNCNNNoQfemyCW57kSc9EAk6Il2X6dlW1bXIQZo515VuWLTB9j3QxNQo9DRUPTuJLDIO_FJBPUeLWxSsswshY9Ykgj4zS_qj1dOgbIWawRbCGTDAULN5-j3swrm_n8zJXHKEM4sgLHTZuzrhj8u8GuUIeE3TaPNZVOYYAHXCh5Q0nEnXwvIJGTsO3jlOh-8KfDM63DXbAsZInw26EWsvbZTp081qxdeDQ1c63yh9-DpR0jfUx1-tvmC_Nzg6tR9Awm9H9zq2hSYW"/>
-</div>
-</div>
-</header>
-<!-- Employers Section -->
-<section class="py-24 bg-surface-container-low">
-<div class="max-w-7xl mx-auto px-8">
-<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
-<div>
-<span class="text-secondary font-manrope font-bold tracking-widest text-xs uppercase mb-4 block">Command Center</span>
-<h2 class="text-4xl md:text-5xl font-headline font-bold text-white tracking-tight">Command Your Operations</h2>
-</div>
-<p class="text-on-surface-variant max-w-md font-body">
-                    Complete oversight with institutional-grade analytics. Nexus gives you the tools to scale your workforce without sacrificing quality or security.
-                </p>
-</div>
-<div class="grid md:grid-cols-3 gap-8">
-<div class="glass-panel p-8 rounded-xl border border-outline-variant/20 hover:border-primary/30 transition-all group">
-<div class="flex justify-between items-start mb-12">
-<span class="material-symbols-outlined text-4xl text-primary-fixed-dim group-hover:scale-110 transition-transform">monitoring</span>
-<span class="text-secondary text-sm font-bold bg-secondary-container/20 px-3 py-1 rounded-full">+12.5%</span>
-</div>
-<div class="space-y-1">
-<p class="text-sm font-label text-on-surface-variant">Active Tasks</p>
-<h3 class="text-4xl font-headline font-bold text-white">1,284</h3>
-</div>
-</div>
-<div class="glass-panel p-8 rounded-xl border border-outline-variant/20 hover:border-primary/30 transition-all group">
-<div class="flex justify-between items-start mb-12">
-<span class="material-symbols-outlined text-4xl text-secondary-fixed-dim group-hover:scale-110 transition-transform">payments</span>
-<span class="text-primary text-sm font-bold bg-primary-container/40 px-3 py-1 rounded-full">Automated</span>
-</div>
-<div class="space-y-1">
-<p class="text-sm font-label text-on-surface-variant">Total Disbursed</p>
-<h3 class="text-4xl font-headline font-bold text-white">$42.8k</h3>
-</div>
-</div>
-<div class="md:col-span-1 bg-surface-container rounded-xl overflow-hidden relative">
-<img alt="Analytics" class="w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-700" data-alt="Sleek dark mode analytics dashboard showing neon blue and green charts and data points for workforce performance" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCrAh_Kt2YGXyRHdyTewlXT68Na8fJOQ_Ujxl4WzXrmnZta9wdlaUOqD5sN57Y74shH731qmAgTsORxrLKrWGUte7Pxd9drxYjpTpbZG5axtlfE-cezSTqoOyFO-U6Ldhc_8JaJvUx_PJqtFsRW87uNhPa1K5V1onkXIdQn-8BbodARdA7oGiktvBLjw8RfUh31-mb5Issvdgw_HHdknXcM5HRpuhkg5HADRLUgX5evYEb_zu_Ym_KRVwq0ouTz6DCZFk3NYCfL3-7"/>
-<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent flex flex-col justify-end p-8">
-<h4 class="text-xl font-headline font-bold text-white mb-2">Real-time Quality Control</h4>
-<p class="text-sm text-on-surface-variant">AI-powered verification for every single micro-task.</p>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- Workers Section -->
-<section class="py-24 overflow-hidden">
-<div class="max-w-7xl mx-auto px-8">
-<div class="grid lg:grid-cols-12 gap-16 items-center">
-<div class="lg:col-span-5">
-<span class="text-tertiary font-manrope font-bold tracking-widest text-xs uppercase mb-4 block">Independent Growth</span>
-<h2 class="text-4xl md:text-5xl font-headline font-bold text-white tracking-tight mb-8">Fuel Your Independence</h2>
-<p class="text-lg text-on-surface-variant font-body mb-10 leading-relaxed">
-                        Access the world's highest-paying micro-tasks. Track your performance with precision metrics and watch your sovereign wealth grow in real-time.
-                    </p>
-<div class="space-y-6">
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
-<span class="material-symbols-outlined text-primary">bolt</span>
-</div>
-<span class="text-white font-manrope font-semibold">Instant settlement for completed milestones.</span>
-</div>
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
-<span class="material-symbols-outlined text-secondary">verified_user</span>
-</div>
-<span class="text-white font-manrope font-semibold">Build a verified reputation score that unlocks premium pools.</span>
-</div>
-</div>
-</div>
-<div class="lg:col-span-7 relative">
-<div class="glass-panel p-8 rounded-xl border border-outline-variant/10 shadow-2xl">
-<div class="flex justify-between items-center mb-8">
-<h4 class="font-headline font-bold text-white">Wage Pulse</h4>
-<span class="text-secondary-fixed-dim text-xs font-bold px-3 py-1 bg-on-secondary-container/20 rounded-full">LIVE TRACKING</span>
-</div>
-<!-- Custom Micro-chart simulation -->
-<div class="h-48 flex items-end gap-2 mb-8">
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[40%]"></div>
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[65%]"></div>
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[55%]"></div>
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[85%]"></div>
-<div class="flex-1 bg-surface-container-highest hover:bg-secondary/40 transition-colors rounded-t-lg h-[100%]"></div>
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[70%]"></div>
-<div class="flex-1 bg-surface-container hover:bg-primary/20 transition-colors rounded-t-lg h-[90%]"></div>
-</div>
-<div class="grid grid-cols-2 gap-4">
-<div class="bg-surface-container-lowest p-4 rounded-lg">
-<p class="text-xs text-slate-500 uppercase font-bold tracking-tighter">Earnings Today</p>
-<p class="text-2xl font-headline font-extrabold text-white">$412.50</p>
-</div>
-<div class="bg-surface-container-lowest p-4 rounded-lg">
-<p class="text-xs text-slate-500 uppercase font-bold tracking-tighter">Performance Rank</p>
-<p class="text-2xl font-headline font-extrabold text-secondary">Top 0.5%</p>
-</div>
-</div>
-</div>
-<!-- Decorator task card -->
-<div class="absolute -bottom-8 -right-8 w-64 glass-panel p-4 rounded-lg border border-outline-variant/20 hidden md:block">
-<div class="flex gap-3 items-center">
-<div class="w-10 h-10 rounded-lg bg-tertiary/20 flex items-center justify-center text-tertiary">
-<span class="material-symbols-outlined">data_object</span>
-</div>
-<div>
-<p class="text-xs font-bold text-white">Priority Task</p>
-<p class="text-[10px] text-slate-400">Schema Validation</p>
-</div>
-<div class="ml-auto text-primary text-xs font-bold">$12.00</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- Features Bento Grid -->
-<section class="py-24 bg-surface-container-lowest">
-<div class="max-w-7xl mx-auto px-8">
-<div class="text-center mb-16">
-<h2 class="text-3xl font-headline font-bold text-white mb-4">Engineered for Perfection</h2>
-<div class="w-16 h-1 nexus-gradient mx-auto rounded-full"></div>
-</div>
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-<div class="md:col-span-2 bg-surface-container p-10 rounded-xl hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined text-primary text-4xl mb-6">speed</span>
-<h3 class="text-2xl font-headline font-bold text-white mb-4">Instant Settlements</h3>
-<p class="text-on-surface-variant font-body">Payments are processed the millisecond a task is verified. No waiting periods, no friction, just pure liquidity.</p>
-</div>
-<div class="md:col-span-2 bg-surface-container p-10 rounded-xl hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined text-secondary text-4xl mb-6">verified</span>
-<h3 class="text-2xl font-headline font-bold text-white mb-4">Elite Verification</h3>
-<p class="text-on-surface-variant font-body">Our 7-layer verification protocol ensures every contributor meets the highest standards of professional excellence.</p>
-</div>
-<div class="md:col-span-2 bg-surface-container p-10 rounded-xl hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined text-tertiary text-4xl mb-6">public</span>
-<h3 class="text-2xl font-headline font-bold text-white mb-4">Global Task Index</h3>
-<p class="text-on-surface-variant font-body">Access a unified stream of elite opportunities from Fortune 500 companies and tech pioneers across the globe.</p>
-</div>
-<div class="md:col-span-2 bg-surface-container p-10 rounded-xl hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined text-primary-fixed-dim text-4xl mb-6">analytics</span>
-<h3 class="text-2xl font-headline font-bold text-white mb-4">Real-time Analytics</h3>
-<p class="text-on-surface-variant font-body">Granular data insights into your team's velocity, quality trends, and financial efficiency in one dashboard.</p>
-</div>
-</div>
-</div>
-</section>
-<!-- Testimonial Section -->
-<section class="py-32 px-8 bg-surface">
-<div class="max-w-5xl mx-auto relative">
-<span class="material-symbols-outlined text-7xl text-primary/10 absolute -top-12 -left-8 pointer-events-none">format_quote</span>
-<div class="relative z-10 text-center">
-<blockquote class="text-3xl md:text-4xl font-headline font-bold text-white italic leading-tight mb-12">
-                    "Nexus has fundamentally shifted how we view distributed work. It's not just a platform; it's a sovereign operating system that has increased our architectural team's output by 140%."
-                </blockquote>
-<div class="flex flex-col items-center">
-<img alt="Lead Architect" class="w-16 h-16 rounded-full object-cover mb-4 border-2 border-primary/30" data-alt="Professional headshot of a mature man with a thoughtful expression, wearing a tailored navy blazer in a high-end office environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5Z2NZ5R8Afga77ZAyyfDNVexsiWaD5aixY0y9QVcu0xwyaRBVybG5tg779fFiWTu44_lgfXMvlVfZx4QKldAqdouPqW6852Mx0a_itz5FImQ8ExaARo-8GkVJxQV8W2ubYaINsz_hsex6GRgrYhMBZ15OEISmx8PwH5Zv7uYv5FF4a_s1U616xRgZWO-iZ4z9raQYyNveCe_T3DOrUzVtSBwD1Ws6S5xJNpC03IWERAEb0JrNcPWCLbYMfxM7pvm-v7bb8zE6_GvS"/>
-<p class="font-headline font-bold text-white">Julian Sterling</p>
-<p class="text-sm text-primary-fixed-dim uppercase tracking-widest font-bold">Lead Architect, Sovereign Systems</p>
-</div>
-</div>
-</div>
-</section>
-<!-- Footer -->
-<footer class="bg-slate-900 w-full py-12 px-8">
-<div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-<div class="col-span-2 md:col-span-1">
-<div class="text-lg font-black text-white mb-6">Nexus</div>
-<p class="text-slate-500 font-inter text-xs leading-relaxed max-w-[200px]">
-                    The architectural foundation for the future of professional independence and organizational command.
-                </p>
-</div>
-<div class="flex flex-col gap-3">
-<h5 class="text-white font-manrope font-bold text-sm mb-2">Company</h5>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Enterprise Solutions</a>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Affiliate Program</a>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Global Task Index</a>
-</div>
-<div class="flex flex-col gap-3">
-<h5 class="text-white font-manrope font-bold text-sm mb-2">Legal</h5>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Terms of Service</a>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Privacy Policy</a>
-</div>
-<div class="flex flex-col gap-3">
-<h5 class="text-white font-manrope font-bold text-sm mb-2">Support</h5>
-<a class="text-slate-500 hover:text-emerald-400 transition-colors font-inter text-xs tracking-wide" href="#">Support Center</a>
-<div class="mt-4 flex gap-4">
-<span class="material-symbols-outlined text-slate-500 hover:text-primary transition-colors cursor-pointer">share</span>
-<span class="material-symbols-outlined text-slate-500 hover:text-primary transition-colors cursor-pointer">alternate_email</span>
-</div>
-</div>
-</div>
-<div class="max-w-7xl mx-auto pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-<p class="text-slate-500 font-inter text-xs tracking-wide">© 2024 Nexus Sovereign Workspace. All rights reserved.</p>
-<div class="flex items-center gap-2">
-<div class="w-2 h-2 rounded-full bg-secondary"></div>
-<span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Network Status: Optimal</span>
-</div>
-</div>
-</footer>
-</body></html>
+    <!-- Welcome Banner for Logged In Users -->
+    <% if (currentUser != null) { %>
+    <div class="container">
+        <div class="welcome-banner">
+            <div>
+                <h2>Welcome back, <%= currentUser.getFullName() %>!</h2>
+                <p>You're logged in as <%= "admin".equals(currentUser.getRole()) ? "Administrator" : "Worker" %>. Ready to get things done?</p>
+            </div>
+            <% if ("admin".equals(currentUser.getRole())) { %>
+                <a href="${pageContext.request.contextPath}/admin" class="dashboard-link">Go to Admin Dashboard →</a>
+            <% } else { %>
+                <a href="${pageContext.request.contextPath}/worker" class="dashboard-link">Go to Worker Dashboard →</a>
+            <% } %>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Core Capabilities Section -->
+    <section class="section" id="features">
+        <div class="container">
+            <h2>CORE CAPABILITIES</h2>
+            <div class="grid-2">
+                <!-- Admin Control Card -->
+                <div class="card">
+                    <div class="card-icon">⚙️</div>
+                    <h3>ADMIN CONTROL</h3>
+                    <p>Full-spectrum governance with granular permission layers and real-time oversight of every project node.</p>
+                    <ul class="feature-list">
+                        <li>Node Architecture</li>
+                        <li>Security Protocols</li>
+                        <li>Worker Management</li>
+                        <li>Analytics Dashboard</li>
+                    </ul>
+                </div>
+                
+                <!-- Worker Velocity Card -->
+                <div class="card">
+                    <div class="card-icon">⚡</div>
+                    <h3>WORKER VELOCITY</h3>
+                    <p>Streamlined execution workflows that eliminate friction. Focused views for high-impact task delivery.</p>
+                    <ul class="feature-list">
+                        <li>Active Task Queues</li>
+                        <li>Resource Linking</li>
+                        <li>Earnings Tracking</li>
+                        <li>Performance Metrics</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architectural Integrity Section -->
+    <section class="section architectural-section">
+        <div class="container">
+            <div class="architectural-content">
+                <h2>ARCHITECTURAL INTEGRITY</h2>
+                <p class="architectural-text">Our platform isn't just about managing tasks; it's about building systems. Leverage our structural components to create a workspace that mirrors your organization's logic perfectly.</p>
+                <a href="#tutorials" class="btn btn-outline">EXPLORE SCHEMA →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Media Elements Grid -->
+    <section class="section">
+        <div class="container">
+            <div class="media-grid">
+                <div class="media-card">
+                    <div class="media-placeholder">
+                        <div class="video-badge">▶ VIDEO PREVIEW</div>
+                    </div>
+                    <div class="media-caption">Walkthrough: Nexus Core Architecture</div>
+                </div>
+                <div class="media-card">
+                    <div class="media-placeholder">
+                        <div class="map-badge">🌍 GLOBAL NODE MAP</div>
+                    </div>
+                    <div class="media-caption">Real-time Geographic Distribution</div>
+                </div>
+                <div class="media-card">
+                    <div class="media-placeholder">
+                        <div class="chart-badge">📈 METRIC FLOW</div>
+                    </div>
+                    <div class="media-caption">Project Velocity Analytics</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tutorial Hub -->
+    <section class="section" id="tutorials">
+        <div class="container">
+            <h2>TUTORIAL HUB</h2>
+            <p class="section-subtitle">Learn the mechanics of the Nexus ecosystem through raw technical walkthroughs.</p>
+            <div class="tutorial-grid">
+                <div class="tutorial-item">
+                    <h4>01. Node Initialization</h4>
+                    <p>Configure your first operational node with CLI tools.</p>
+                </div>
+                <div class="tutorial-item">
+                    <h4>02. Permission Layers</h4>
+                    <p>Implement granular access control structures.</p>
+                </div>
+                <div class="tutorial-item">
+                    <h4>03. Task Queues</h4>
+                    <p>Optimize worker velocity with advanced routing.</p>
+                </div>
+                <div class="tutorial-item">
+                    <h4>04. Real-time Metrics</h4>
+                    <p>Connect telemetry streams to your dashboard.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Global Nodes + Metric Flow Combined Section -->
+    <section class="section">
+        <div class="container">
+            <div class="grid-2">
+                <!-- Global Nodes -->
+                <div>
+                    <h2>GLOBAL NODES</h2>
+                    <p class="section-subtitle">Track your team across geographic coordinates with real-time latency indicators.</p>
+                    <div class="nodes-container">
+                        <div class="node-row">
+                            <span class="node-location">North America (NA-01)</span>
+                            <span class="latency"><span class="latency-indicator"></span>24ms</span>
+                        </div>
+                        <div class="node-row">
+                            <span class="node-location">Europe (EU-02)</span>
+                            <span class="latency"><span class="latency-indicator"></span>47ms</span>
+                        </div>
+                        <div class="node-row">
+                            <span class="node-location">Asia-Pacific (AP-03)</span>
+                            <span class="latency"><span class="latency-indicator"></span>89ms</span>
+                        </div>
+                        <div class="node-row">
+                            <span class="node-location">South America (SA-04)</span>
+                            <span class="latency"><span class="latency-indicator"></span>112ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metric Flow -->
+                <div>
+                    <h2>METRIC FLOW</h2>
+                    <p class="section-subtitle">Direct observation of project velocity and resource allocation efficiency.</p>
+                    <div class="metrics-panel">
+                        <div class="metric-card">
+                            <div class="metric-label">Project Velocity</div>
+                            <div class="metric-value">284</div>
+                            <div class="metric-trend">↑ +12.4%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Resource Efficiency</div>
+                            <div class="metric-value">94.2%</div>
+                            <div class="metric-trend">↑ +3.1%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Active Nodes</div>
+                            <div class="metric-value">47</div>
+                            <div class="metric-trend">Online</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Throughput</div>
+                            <div class="metric-value">1.2M</div>
+                            <div class="metric-trend">ops/sec</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="copyright">NEXUS © 2025 Nexus Works. All rights reserved.</div>
+            <div class="footer-links">
+                <a href="#">Privacy</a>
+                <a href="#">Security</a>
+                <a href="#">Status</a>
+                <a href="#">API Docs</a>
+                <a href="#">Support</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+        
+        // Add animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.card, .media-card, .tutorial-item').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'all 0.5s ease';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

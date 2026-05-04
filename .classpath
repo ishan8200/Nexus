@@ -13,7 +13,47 @@
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.web.container"/>
 	<classpathentry kind="con" path="org.eclipse.jst.j2ee.internal.module.container"/>
-	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/mysql-connector-j-9.6.0/mysql-connector-j-9.6.0/mysql-connector-j-9.6.0.jar">
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.activation-2.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.el-api-4.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.servlet.jsp.jstl-2.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.servlet.jsp.jstl-api-2.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.servlet-api-5.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/jar_files/jakarta.xml.bind-api-3.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/Java Jar Files/mysql-connector-j-9.0.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/gson-2.14.0.jar">
+		<attributes>
+			<attribute name="module" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/Ripple Device/Downloads/JavaJarFiles_69c49433-d65f-4742-a0d7-93cefeffea52_278170_/jbcrypt-0.4.jar">
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>

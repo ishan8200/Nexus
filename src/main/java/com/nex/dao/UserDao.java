@@ -1,68 +1,469 @@
 package com.nex.dao;
 
-import com.nex.config.DBConfig;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.mindrot.jbcrypt.BCrypt;
+
 import com.nex.model.User;
-import org.mindrot.jbcrypt.BCrypt; // Standard BCrypt library
-import java.sql.*;
+import com.nex.config.DBConnection;
 
 /**
- * UserDao handles all database operations for the User model.
- * It includes methods for user registration and validation.
+ * UserDAO handles all database operations for the User model.
+ * Includes methods for authentication, user management, and worker statistics.
+ * Uses BCrypt for secure password hashing.
  */
-public class UserDao {
+
+public class UserDAO {
+    
+    // ==================== USER REGISTRATION & AUTHENTICATION ====================
     
     /**
-     * Registers a new user into the database.
-     * Uses BCrypt to hash the password before saving for security.
+     * Register a new user with BCrypt hashed password
      */
     public boolean registerUser(User user) {
-        String query = "INSERT INTO users (username, password, email, role, dateAdded) VALUES (?, ?, ?, ?, NOW())";
-        // Hashing the password with a salt
-        String hashedPassword = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
-        
-        try (Connection conn = DBConfig.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+        String sql = "INSERT INTO users (username, email, password, full_name, phone, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            // Hash the password using BCrypt
+            String hashedPassword = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
             
             pstmt.setString(1, user.getUsername());
-            pstmt.setString(2, hashedPassword); // Store the hashed password
-            pstmt.setString(3, user.getEmail());
-            pstmt.setString(4, user.getRole());
+            pstmt.setString(2, user.getEmail());
+            pstmt.setString(3, hashedPassword);  // Store hashed password
+            pstmt.setString(4, user.getFullName());
+            pstmt.setString(5, user.getPhone());
+            pstmt.setString(6, user.getRole());
+            pstmt.setString(7, "pending");
             
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error during registration: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
-
+    
     /**
-     * Validates a user's credentials against the database.
-     * Fetches the user by username and compares the provided password with the stored hash.
+     * Validate user credentials for login using EMAIL with BCrypt verification
      */
-    public User validateUser(String username, String password) {
-        String query = "SELECT id, username, password FROM users WHERE username = ?";
-        
-        try (Connection conn = DBConfig.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(query)) {
+    public User loginUser(String email, String password) {
+        String sql = "SELECT * FROM users WHERE email = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            pstmt.setString(1, username);
+            pstmt.setString(1, email);
             ResultSet rs = pstmt.executeQuery();
             
             if (rs.next()) {
-                String storedHash = rs.getString("password");
-                // Use BCrypt to check if the password matches the hash
-                if (BCrypt.checkpw(password, storedHash)) {
-                    User user = new User();
-                    user.setId(rs.getInt("id"));
-                    user.setUsername(rs.getString("username"));
-                    user.setEmail(rs.getString("email"));
-                    //user.setRole(rs.getString("role"));
+                String hashedPassword = rs.getString("password");
+                // Verify password using BCrypt
+                if (BCrypt.checkpw(password, hashedPassword)) {
+                    User user = extractUserFromResultSet(rs);
+                    updateLastLogin(user.getId());
                     return user;
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error during validation: " + e.getMessage());
+            e.printStackTrace();
         }
-        return null; // Return null if user not found or password incorrect
+        return null;
+    }
+    
+    /**
+     * Check if username exists
+     */
+    public boolean isUsernameExists(String username) {
+        String sql = "SELECT id FROM users WHERE username = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Check if email exists
+     */
+    public boolean isEmailExists(String email) {
+        String sql = "SELECT id FROM users WHERE email = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, email);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Update last login timestamp
+     */
+    public void updateLastLogin(int userId) {
+        String sql = "UPDATE users SET last_login = NOW() WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // ==================== USER MANAGEMENT ====================
+    
+    /**
+     * Get user by ID
+     */
+    public User getUserById(int id) {
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return extractUserFromResultSet(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    /**
+     * Get user by email
+     */
+    public User getUserByEmail(String email) {
+        String sql = "SELECT * FROM users WHERE email = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, email);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return extractUserFromResultSet(rs);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    /**
+     * Get all workers
+     */
+    public List<User> getAllWorkers() {
+        List<User> workers = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE role = 'worker' ORDER BY created_at DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                workers.add(extractUserFromResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return workers;
+    }
+    
+    /**
+     * Get all workers with statistics
+     */
+    public List<Map<String, Object>> getAllWorkersWithStats() {
+        List<Map<String, Object>> workers = new ArrayList<>();
+        String sql = "SELECT u.*, COUNT(DISTINCT t.id) as tasks_completed_count " +
+                     "FROM users u " +
+                     "LEFT JOIN tasks t ON t.assigned_to = u.id AND t.status = 'completed' " +
+                     "WHERE u.role = 'worker' " +
+                     "GROUP BY u.id ORDER BY u.created_at DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> worker = new HashMap<>();
+                worker.put("id", rs.getInt("id"));
+                worker.put("username", rs.getString("username"));
+                worker.put("email", rs.getString("email"));
+                worker.put("full_name", rs.getString("full_name"));
+                worker.put("phone", rs.getString("phone"));
+                worker.put("role", rs.getString("role"));
+                worker.put("status", rs.getString("status"));
+                worker.put("skills", rs.getString("skills"));
+                worker.put("rating", rs.getDouble("rating"));
+                worker.put("total_earned", rs.getDouble("total_earned"));
+                worker.put("tasks_completed", rs.getInt("tasks_completed_count"));
+                worker.put("created_at", rs.getTimestamp("created_at"));
+                workers.add(worker);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return workers;
+    }
+    
+    /**
+     * Get active worker count
+     */
+    public int getActiveWorkerCount() {
+        String sql = "SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'approved'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get pending worker count
+     */
+    public int getPendingWorkerCount() {
+        String sql = "SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'pending'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get pending workers list
+     */
+    public List<Map<String, Object>> getPendingWorkersList() {
+        List<Map<String, Object>> workers = new ArrayList<>();
+        String sql = "SELECT id, full_name, email, phone, skills, created_at FROM users WHERE role = 'worker' AND status = 'pending' ORDER BY created_at DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> worker = new HashMap<>();
+                worker.put("id", rs.getInt("id"));
+                worker.put("full_name", rs.getString("full_name"));
+                worker.put("email", rs.getString("email"));
+                worker.put("phone", rs.getString("phone"));
+                worker.put("skills", rs.getString("skills"));
+                worker.put("created_at", rs.getTimestamp("created_at"));
+                workers.add(worker);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return workers;
+    }
+    
+    /**
+     * Update worker status (approve/reject/block)
+     */
+    public boolean updateWorkerStatus(int userId, String status) {
+        String sql = "UPDATE users SET status = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, status);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Update user profile
+     */
+    public boolean updateUserProfile(User user) {
+        String sql = "UPDATE users SET full_name = ?, phone = ?, skills = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, user.getFullName());
+            pstmt.setString(2, user.getPhone());
+            pstmt.setString(3, user.getSkills());
+            pstmt.setInt(4, user.getId());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Change user password with BCrypt hashing
+     */
+    public boolean changePassword(int userId, String newPassword) {
+        // Hash the new password
+        String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        String sql = "UPDATE users SET password = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, hashedPassword);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    
+    /**
+     * Validate current password for a user (useful before changing password)
+     */
+    public boolean validateCurrentPassword(int userId, String currentPassword) {
+        String sql = "SELECT password FROM users WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                String hashedPassword = rs.getString("password");
+                return BCrypt.checkpw(currentPassword, hashedPassword);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    
+    /**
+     * Get workers for dropdown (simple list)
+     */
+    public List<Map<String, Object>> getWorkersForDropdown() {
+        List<Map<String, Object>> workers = new ArrayList<>();
+        String sql = "SELECT id, full_name as name FROM users WHERE role = 'worker' AND status = 'approved' ORDER BY full_name";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> worker = new HashMap<>();
+                worker.put("id", rs.getInt("id"));
+                worker.put("name", rs.getString("name"));
+                workers.add(worker);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return workers;
+    }
+    
+    // ==================== WORKER STATISTICS ====================
+    
+    /**
+     * Get worker statistics using stored procedure
+     */
+    public Map<String, Object> getWorkerStats(int workerId) {
+        Map<String, Object> stats = new HashMap<>();
+        String sql = "{CALL GetWorkerStats(?)}";
+        try (Connection conn = DBConnection.getConnection();
+             CallableStatement cstmt = conn.prepareCall(sql)) {
+            cstmt.setInt(1, workerId);
+            ResultSet rs = cstmt.executeQuery();
+            if (rs.next()) {
+                stats.put("total_earned", rs.getDouble("total_earned"));
+                stats.put("tasks_completed", rs.getInt("tasks_completed"));
+                stats.put("avg_rating", rs.getDouble("avg_rating"));
+                stats.put("pending_payment", rs.getDouble("pending_payment"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return stats;
+    }
+    
+    /**
+     * Get worker earnings breakdown by month
+     */
+    public List<Map<String, Object>> getWorkerEarnings(int workerId) {
+        List<Map<String, Object>> earnings = new ArrayList<>();
+        String sql = "{CALL GetWorkerEarnings(?)}";
+        try (Connection conn = DBConnection.getConnection();
+             CallableStatement cstmt = conn.prepareCall(sql)) {
+            cstmt.setInt(1, workerId);
+            ResultSet rs = cstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> earning = new HashMap<>();
+                earning.put("month", rs.getString("month"));
+                earning.put("task_count", rs.getInt("task_count"));
+                earning.put("total_amount", rs.getDouble("total_amount"));
+                earnings.add(earning);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return earnings;
+    }
+    
+    /**
+     * Get worker's assigned tasks
+     */
+    public List<Map<String, Object>> getMyTasks(int workerId) {
+        List<Map<String, Object>> tasks = new ArrayList<>();
+        String sql = "SELECT t.*, ts.status as submission_status " +
+                     "FROM tasks t " +
+                     "LEFT JOIN task_submissions ts ON ts.task_id = t.id AND ts.worker_id = ? " +
+                     "WHERE t.assigned_to = ? OR (t.status = 'open' AND ts.id IS NULL) " +
+                     "ORDER BY t.deadline ASC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, workerId);
+            pstmt.setInt(2, workerId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> task = new HashMap<>();
+                task.put("id", rs.getInt("id"));
+                task.put("title", rs.getString("title"));
+                task.put("description", rs.getString("description"));
+                task.put("wage", rs.getDouble("wage"));
+                task.put("wage_type", rs.getString("wage_type"));
+                task.put("deadline", rs.getDate("deadline"));
+                task.put("priority", rs.getString("priority"));
+                task.put("status", rs.getString("status"));
+                task.put("submission_status", rs.getString("submission_status"));
+                tasks.add(task);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return tasks;
+    }
+    
+    // ==================== HELPER METHODS ====================
+    
+    /**
+     * Extract User object from ResultSet
+     */
+    private User extractUserFromResultSet(ResultSet rs) throws SQLException {
+        User user = new User();
+        user.setId(rs.getInt("id"));
+        user.setUsername(rs.getString("username"));
+        user.setEmail(rs.getString("email"));
+        user.setPassword(rs.getString("password"));
+        user.setFullName(rs.getString("full_name"));
+        user.setPhone(rs.getString("phone"));
+        user.setRole(rs.getString("role"));
+        user.setStatus(rs.getString("status"));
+        user.setProfilePic(rs.getString("profile_pic"));
+        user.setSkills(rs.getString("skills"));
+        user.setRating(rs.getDouble("rating"));
+        user.setTotalEarned(rs.getDouble("total_earned"));
+        user.setTasksCompleted(rs.getInt("tasks_completed"));
+        user.setCreatedAt(rs.getTimestamp("created_at"));
+        user.setLastLogin(rs.getTimestamp("last_login"));
+        return user;
     }
 }
