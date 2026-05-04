@@ -11,22 +11,28 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-@WebServlet({"/home", "/"})
+@WebServlet({"/home", ""})
 public class HomeController extends HttpServlet {
-    
+
     private static final long serialVersionUID = 1L;
-    
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        
+
         HttpSession session = request.getSession(false);
         User currentUser = (session != null) ? (User) session.getAttribute("user") : null;
-        
+
+        // If user is already logged in, redirect them to their respective dashboard
         if (currentUser != null) {
-            request.setAttribute("currentUser", currentUser);
+            if ("admin".equals(currentUser.getRole())) {
+                response.sendRedirect(request.getContextPath() + "/admin");
+            } else {
+                response.sendRedirect(request.getContextPath() + "/worker");
+            }
+            return;
         }
-        
+
         request.getRequestDispatcher("/WEB-INF/pages/home.jsp").forward(request, response);
     }
 }

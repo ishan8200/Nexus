@@ -131,6 +131,9 @@ public class AuthController extends HttpServlet {
                 response.addCookie(userCookie);
             }
             
+            // Update last login timestamp
+            userDao.updateLastLogin(user.getId());
+            
             // Redirect based on role
             if ("admin".equals(user.getRole())) {
                 response.sendRedirect(request.getContextPath() + "/admin");
@@ -251,7 +254,7 @@ public class AuthController extends HttpServlet {
                 ("admin".equals(role) ? "You can now log in." : "Please wait for admin approval before logging in.");
             response.sendRedirect(request.getContextPath() + "/login?success=" + java.net.URLEncoder.encode(successMsg, "UTF-8"));
         } else {
-            request.setAttribute("error", "Registration failed. Please try again.");
+            request.setAttribute("error", "Registration failed. This email or username may already be taken.");
             request.getRequestDispatcher("/WEB-INF/pages/register.jsp").forward(request, response);
         }
     }

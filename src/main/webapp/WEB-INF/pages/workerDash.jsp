@@ -1,44 +1,25 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.sql.*, java.util.*, com.nex.model.User" %>
-<%@ page import="com.nex.dao.TaskDAO, com.nex.dao.UserDAO, com.nex.dao.WageDAO" %>
+<%@ page import="java.util.*, com.nex.model.User" %>
 <%
-    // Check if user is logged in and is worker
-    HttpSession sessionObj = request.getSession(false);
-    User currentUser = (sessionObj != null) ? (User) sessionObj.getAttribute("user") : null;
-    
-    if (currentUser == null || !"worker".equals(currentUser.getRole())) {
-        response.sendRedirect(request.getContextPath() + "/login.jsp");
+    // Check if user is logged in and is a worker
+    User currentUser = (User) request.getAttribute("currentUser");
+    if (currentUser == null) {
+        response.sendRedirect(request.getContextPath() + "/login");
         return;
     }
+
+    List<Map<String, Object>> availableTasks = (List<Map<String, Object>>) request.getAttribute("availableTasks");
+    List<Map<String, Object>> myTasks = (List<Map<String, Object>>) request.getAttribute("myTasks");
+    List<Map<String, Object>> earningsHistory = (List<Map<String, Object>>) request.getAttribute("earningsHistory");
     
-    // Initialize DAOs
-    TaskDAO taskDAO = new TaskDAO();
-    UserDAO userDAO = new UserDAO();
-    WageDAO wageDAO = new WageDAO();
+    // Stats
+    Double totalEarned = (Double) request.getAttribute("totalEarned");
+    Integer tasksCompleted = (Integer) request.getAttribute("tasksCompleted");
+    Double avgRating = (Double) request.getAttribute("avgRating");
+    Double pendingPayment = (Double) request.getAttribute("pendingPayment");
     
-    int workerId = currentUser.getId();
-    
-    // Get worker statistics
-    Map<String, Object> workerStats = userDAO.getWorkerStats(workerId);
-    double totalEarned = (double) workerStats.get("total_earned");
-    int tasksCompleted = (int) workerStats.get("tasks_completed");
-    double avgRating = (double) workerStats.get("avg_rating");
-    double pendingPayment = (double) workerStats.get("pending_payment");
-    
-    // Get available tasks
-    List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks();
-    
-    // Get worker's assigned tasks
-    List<Map<String, Object>> myTasks = userDAO.getMyTasks(workerId);
-    
-    // Get earnings breakdown
-    List<Map<String, Object>> earningsBreakdown = userDAO.getWorkerEarnings(workerId);
-    
-    // Get payment history
-    List<Map<String, Object>> paymentHistory = wageDAO.getPaymentHistory(workerId);
-    
-    // Get recent ratings
-    List<Map<String, Object>> recentRatings = taskDAO.getWorkerRatings(workerId);
+    // Formatter for currency
+    java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(Locale.US);
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,35 +27,113 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Worker Dashboard | Nexus Works</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
+    <script src="${pageContext.request.contextPath}/js/alert.js"></script>
     <style>
-        .page-section { display: none; }
-        .page-section.active { display: block; }
-        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; visibility: hidden; opacity: 0; transition: all 0.3s ease; }
-        .modal-overlay.active { visibility: visible; opacity: 1; }
-        .modal-container { background: white; border-radius: 16px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #e2e2dc; }
-        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; }
-        .modal-body { padding: 20px; }
-        .modal-footer { padding: 16px 20px; border-top: 1px solid #e2e2dc; display: flex; justify-content: flex-end; gap: 12px; }
-        .file-upload { border: 2px dashed #e2e2dc; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s ease; }
-        .file-upload:hover { border-color: #3b82f6; background: rgba(59,130,246,0.02); }
-        .progress-bar { height: 8px; background: #e2e2dc; border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 4px; transition: width 0.3s ease; }
-        .deadline-countdown.urgent { color: #ef4444; font-weight: 600; }
-        .deadline-countdown.warning { color: #f59e0b; }
-        .deadline-countdown.normal { color: #10b981; }
-        .heatmap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 16px; }
-        .heatmap-day { aspect-ratio: 1; background: #e2e2dc; border-radius: 2px; transition: all 0.2s ease; }
-        .heatmap-day.level-1 { background: rgba(59,130,246,0.2); }
-        .heatmap-day.level-2 { background: rgba(59,130,246,0.4); }
-        .heatmap-day.level-3 { background: rgba(59,130,246,0.6); }
-        .heatmap-day.level-4 { background: rgba(59,130,246,0.8); }
-        .heatmap-day.level-5 { background: #3b82f6; }
-        .heatmap-day:hover { transform: scale(1.1); }
+        /* Custom overrides for dashboard specific elements */
+        .admin-main {
+            scroll-behavior: smooth;
+        }
+        .nav-badge {
+            background: var(--nexus-accent);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: auto;
+        }
+        .worker-stat-card {
+            background: white;
+            border: 1px solid var(--nexus-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            transition: all var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        }
+        .worker-stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.05);
+            border-color: var(--nexus-accent-glow);
+        }
+        .worker-stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--nexus-accent);
+        }
+        .worker-stat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .worker-stat-icon {
+            font-size: 24px;
+        }
+        .worker-stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .worker-stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .worker-stat-change {
+            font-size: 11px;
+            margin-top: 8px;
+            color: var(--nexus-success);
+            font-weight: 600;
+        }
+        .page-section {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .page-section.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .task-card-improved {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px;
+            background: white;
+            border: 1px solid var(--nexus-border);
+            border-radius: var(--radius-lg);
+            transition: all 0.3s ease;
+        }
+        .task-card-improved:hover {
+            border-color: var(--nexus-accent);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+        }
+        .task-priority-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            width: fit-content;
+        }
+        .tag-high { background: var(--nexus-danger-light); color: var(--nexus-danger); }
+        .tag-medium { background: var(--nexus-warning-light); color: var(--nexus-warning); }
+        .tag-low { background: var(--nexus-success-light); color: var(--nexus-success); }
     </style>
 </head>
 <body>
@@ -93,192 +152,158 @@
         </div>
     </nav>
 
-    <!-- Worker Layout with Sidebar -->
+    <!-- Worker Layout -->
     <div class="admin-layout">
-        <!-- Left Sidebar Navigation -->
+        <!-- Sidebar -->
         <aside class="admin-sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h3>Navigation</h3>
                 <div class="admin-profile">
-                    <div class="admin-avatar"><%= currentUser.getFullName().charAt(0) %></div>
+                    <div class="admin-avatar"><%= currentUser.getFullName().substring(0, 1).toUpperCase() %></div>
                     <div class="admin-info">
                         <h4><%= currentUser.getFullName() %></h4>
-                        <p>Worker</p>
+                        <p><%= currentUser.getRole().substring(0, 1).toUpperCase() + currentUser.getRole().substring(1) %></p>
                     </div>
                 </div>
             </div>
             
             <nav class="sidebar-nav">
                 <div class="nav-section-title">MAIN</div>
-                <a href="#" class="nav-item active" data-page="dashboard">
+                <a href="javascript:void(0)" class="nav-item active" onclick="switchToPage('dashboard')">
                     <span class="nav-icon">📊</span>
                     <span class="nav-text">Dashboard</span>
                 </a>
-                <a href="#" class="nav-item" data-page="available-tasks">
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('available-tasks')">
                     <span class="nav-icon">🔍</span>
                     <span class="nav-text">Available Tasks</span>
-                    <span class="nav-badge" id="availableTasksBadge"><%= availableTasks.size() %></span>
+                    <span class="nav-badge"><%= availableTasks != null ? availableTasks.size() : 0 %></span>
                 </a>
-                <a href="#" class="nav-item" data-page="my-tasks">
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-tasks')">
                     <span class="nav-icon">📋</span>
                     <span class="nav-text">My Tasks</span>
-                    <span class="nav-badge" id="myTasksBadge"><%= myTasks.size() %></span>
+                    <span class="nav-badge"><%= myTasks != null ? myTasks.size() : 0 %></span>
                 </a>
                 
                 <div class="nav-section-title">FINANCES</div>
-                <a href="#" class="nav-item" data-page="earnings">
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('earnings')">
                     <span class="nav-icon">💰</span>
-                    <span class="nav-text">Earnings</span>
-                </a>
-                <a href="#" class="nav-item" data-page="payment-history">
-                    <span class="nav-icon">📜</span>
-                    <span class="nav-text">Payment History</span>
+                    <span class="nav-text">Earnings History</span>
                 </a>
                 
-                <div class="nav-section-title">PERFORMANCE</div>
-                <a href="#" class="nav-item" data-page="performance">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-text">My Performance</span>
-                </a>
-                <a href="#" class="nav-item" data-page="activity">
-                    <span class="nav-icon">🔥</span>
-                    <span class="nav-text">Activity</span>
-                </a>
-                
-                <div class="nav-section-title">SETTINGS</div>
-                <a href="#" class="nav-item" data-page="profile">
+                <div class="nav-section-title">ACCOUNT</div>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('profile')">
                     <span class="nav-icon">👤</span>
-                    <span class="nav-text">Profile</span>
+                    <span class="nav-text">My Profile</span>
                 </a>
             </nav>
         </aside>
 
-        <!-- Mobile Sidebar Toggle -->
-        <button class="sidebar-toggle" id="sidebarToggle">☰</button>
-
-        <!-- Main Content Area -->
+        <!-- Main Content -->
         <main class="admin-main">
+            <div id="alertContainer"></div>
+
             <div class="admin-main-header">
                 <div class="page-title">
                     <div>
                         <h1 id="pageTitle">Worker Dashboard</h1>
-                        <p id="pageSubtitle">Welcome back, <%= currentUser.getFullName() %>! Track your tasks and earnings.</p>
+                        <p id="pageSubtitle">Welcome back, <%= currentUser.getFullName().split(" ")[0] %>! Track your tasks and performance.</p>
                     </div>
                 </div>
             </div>
 
             <!-- Dashboard View -->
             <div id="dashboardView" class="page-section active">
-                <!-- Worker Stats -->
                 <div class="worker-stats-grid">
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
                             <span class="worker-stat-icon">💰</span>
                             <span class="worker-stat-label">Total Earned</span>
                         </div>
-                        <div class="worker-stat-value">$<%= String.format("%,.0f", totalEarned) %></div>
-                        <div class="worker-stat-change">All time earnings</div>
+                        <div class="worker-stat-value"><%= cur.format(totalEarned != null ? totalEarned : 0) %></div>
+                        <div class="worker-stat-change">Life-time earnings</div>
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
                             <span class="worker-stat-icon">✅</span>
-                            <span class="worker-stat-label">Tasks Completed</span>
+                            <span class="worker-stat-label">Tasks Done</span>
                         </div>
-                        <div class="worker-stat-value"><%= tasksCompleted %></div>
-                        <div class="worker-stat-change">Total tasks done</div>
+                        <div class="worker-stat-value"><%= tasksCompleted != null ? tasksCompleted : 0 %></div>
+                        <div class="worker-stat-change">Completed missions</div>
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
                             <span class="worker-stat-icon">⭐</span>
-                            <span class="worker-stat-label">Average Rating</span>
+                            <span class="worker-stat-label">Rating</span>
                         </div>
-                        <div class="worker-stat-value"><%= String.format("%.1f", avgRating) %></div>
-                        <div class="worker-stat-change"><%= avgRating >= 4.5 ? "Top performer" : "Good standing" %></div>
+                        <div class="worker-stat-value"><%= avgRating != null ? String.format("%.1f", avgRating) : "0.0" %></div>
+                        <div class="worker-stat-change">Quality score</div>
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
                             <span class="worker-stat-icon">⏳</span>
-                            <span class="worker-stat-label">Pending Payment</span>
+                            <span class="worker-stat-label">Pending</span>
                         </div>
-                        <div class="worker-stat-value">$<%= String.format("%,.0f", pendingPayment) %></div>
+                        <div class="worker-stat-value"><%= cur.format(pendingPayment != null ? pendingPayment : 0) %></div>
                         <div class="worker-stat-change">Awaiting approval</div>
                     </div>
                 </div>
 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <div class="quick-action-card" onclick="switchToPage('available-tasks')">
-                        <div class="quick-action-icon">🔍</div>
-                        <div class="quick-action-title">Find New Tasks</div>
-                        <div class="quick-action-desc">Browse available work</div>
-                    </div>
-                    <div class="quick-action-card" onclick="switchToPage('my-tasks')">
-                        <div class="quick-action-icon">📋</div>
-                        <div class="quick-action-title">My Active Tasks</div>
-                        <div class="quick-action-desc">Continue working</div>
-                    </div>
-                    <div class="quick-action-card" onclick="switchToPage('earnings')">
-                        <div class="quick-action-icon">💰</div>
-                        <div class="quick-action-title">View Earnings</div>
-                        <div class="quick-action-desc">Track your income</div>
-                    </div>
-                    <div class="quick-action-card" onclick="switchToPage('performance')">
-                        <div class="quick-action-icon">📊</div>
-                        <div class="quick-action-title">Performance</div>
-                        <div class="quick-action-desc">See your stats</div>
-                    </div>
-                </div>
-
-                <!-- Recent Tasks & Activity -->
                 <div class="dashboard-grid">
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3>📌 My Active Tasks</h3>
+                            <h3>📌 Active Deliverables</h3>
                             <button class="btn-icon" onclick="switchToPage('my-tasks')">View All →</button>
                         </div>
                         <div class="admin-card-body">
-                            <div class="my-tasks-list">
-                                <% int count = 0; for (Map<String, Object> task : myTasks) { if (count++ >= 3) break; %>
-                                <div class="my-task-item">
-                                    <div class="my-task-header">
-                                        <span class="my-task-title"><%= task.get("title") %></span>
-                                        <span class="deadline-countdown warning">⚠️ Due soon</span>
+                            <% if (myTasks != null && !myTasks.isEmpty()) { %>
+                                <% for (int i = 0; i < Math.min(myTasks.size(), 3); i++) { 
+                                    Map<String, Object> task = myTasks.get(i);
+                                %>
+                                <div style="padding: 15px; border-bottom: 1px solid var(--nexus-border); display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <h4 style="font-weight: 600; margin-bottom: 4px;"><%= task.get("title") %></h4>
+                                        <p style="font-size: 12px; color: var(--text-muted);">Due: <%= task.get("deadline") %></p>
                                     </div>
-                                    <div class="task-description"><%= ((String)task.get("description")).length() > 100 ? ((String)task.get("description")).substring(0, 100) + "..." : task.get("description") %></div>
-                                    <div class="task-footer">
-                                        <span>💰 $<%= task.get("wage") %></span>
-                                        <button class="btn-primary" style="padding: 0.25rem 0.75rem;" onclick="showSubmitWorkModal(<%= task.get("id") %>)">Submit Work</button>
+                                    <div style="text-align: right;">
+                                        <p style="font-weight: 700; color: var(--nexus-accent);"><%= cur.format(task.get("wage")) %></p>
+                                        <p style="font-size: 10px; color: var(--text-light);"><%= task.get("status") %></p>
                                     </div>
                                 </div>
                                 <% } %>
-                                <% if (myTasks.isEmpty()) { %>
-                                <div style="text-align: center; padding: 40px; color: var(--text-muted);">No active tasks. Browse available tasks to get started!</div>
-                                <% } %>
-                            </div>
+                            <% } else { %>
+                                <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                    <p>No active tasks. Time to find some work!</p>
+                                    <button class="btn btn-outline" style="margin-top: 15px;" onclick="switchToPage('available-tasks')">Browse Tasks</button>
+                                </div>
+                            <% } %>
                         </div>
                     </div>
+
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3>📊 Recent Earnings</h3>
-                            <button class="btn-icon" onclick="switchToPage('earnings')">View All →</button>
+                            <h3>📜 Recent Activity</h3>
                         </div>
                         <div class="admin-card-body">
-                            <div class="earnings-timeline">
-                                <% List<Map<String, Object>> recentEarnings = wageDAO.getPaymentHistory(workerId); 
-                                   int earnCount = 0; for (Map<String, Object> payment : recentEarnings) { if (earnCount++ >= 3) break; %>
-                                <div class="earning-item">
-                                    <div class="earning-info">
-                                        <h4><%= payment.get("description") != null ? payment.get("description") : "Payment" %></h4>
-                                        <p>Received on <%= payment.get("payment_date") %></p>
+                            <% if (earningsHistory != null && !earningsHistory.isEmpty()) { %>
+                                <% for (int i = 0; i < Math.min(earningsHistory.size(), 5); i++) { 
+                                    Map<String, Object> entry = earningsHistory.get(i);
+                                %>
+                                <div style="padding: 12px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px; align-items: center;">
+                                    <div style="font-size: 20px;">💰</div>
+                                    <div style="flex: 1;">
+                                        <h4 style="font-weight: 600; font-size: 14px;">Earned in <%= entry.get("month") %></h4>
+                                        <p style="font-size: 11px; color: var(--text-muted);"><%= entry.get("task_count") %> tasks finalized</p>
                                     </div>
-                                    <div class="earning-amount">$<%= payment.get("amount") %></div>
-                                    <div class="earning-status paid">Paid</div>
+                                    <div style="font-weight: 700; color: var(--nexus-success); font-family: 'JetBrains Mono';">
+                                        +<%= cur.format(entry.get("total_amount")) %>
+                                    </div>
                                 </div>
                                 <% } %>
-                                <% if (recentEarnings.isEmpty()) { %>
-                                <div style="text-align: center; padding: 20px; color: var(--text-muted);">No payment history yet</div>
-                                <% } %>
-                            </div>
+                            <% } else { %>
+                                <div style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                    <p>No recent earnings records found.</p>
+                                </div>
+                            <% } %>
                         </div>
                     </div>
                 </div>
@@ -286,137 +311,82 @@
 
             <!-- Available Tasks View -->
             <div id="availableTasksView" class="page-section">
-                <div class="filter-bar">
-                    <select class="filter-select" id="taskTypeFilter">
-                        <option value="all">All Types</option>
-                        <option value="fixed">Fixed Price</option>
-                        <option value="hourly">Hourly</option>
-                    </select>
-                    <select class="filter-select" id="sortByFilter">
-                        <option value="newest">Newest First</option>
-                        <option value="highest">Highest Wage</option>
-                        <option value="deadline">Earliest Deadline</option>
-                    </select>
-                    <input type="text" class="search-input" id="availableTaskSearch" placeholder="Search tasks...">
-                </div>
-
-                <div class="available-tasks-grid" id="availableTasksGrid">
-                    <% for (Map<String, Object> task : availableTasks) { %>
-                    <div class="available-task-card" data-task='<%= new com.google.gson.Gson().toJson(task) %>' onclick="acceptTask(this)">
-                        <div class="available-task-header">
-                            <span class="available-task-title"><%= task.get("title") %></span>
-                            <span class="available-task-wage">$<%= task.get("wage") %>/<%= task.get("wage_type") %></span>
+                <div class="grid-2">
+                    <% if (availableTasks != null && !availableTasks.isEmpty()) { %>
+                        <% for (Map<String, Object> task : availableTasks) { %>
+                            <div class="task-card-improved">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                    <% 
+                                        String priority = (String) task.get("priority");
+                                        String tagClass = "tag-low";
+                                        if ("High".equalsIgnoreCase(priority)) tagClass = "tag-high";
+                                        else if ("Medium".equalsIgnoreCase(priority)) tagClass = "tag-medium";
+                                    %>
+                                    <span class="task-priority-tag <%= tagClass %>"><%= priority %></span>
+                                    <span style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--nexus-accent); font-size: 18px;">
+                                        <%= cur.format(task.get("wage")) %>
+                                    </span>
+                                </div>
+                                <h3 style="font-size: 18px; font-weight: 700;"><%= task.get("title") %></h3>
+                                <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; flex: 1;">
+                                    <%= task.get("description") %>
+                                </p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid var(--nexus-border);">
+                                    <div style="font-size: 12px; color: var(--text-muted);">
+                                        📅 Deadline: <%= task.get("deadline") %>
+                                    </div>
+                                    <button class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
+                                </div>
+                            </div>
+                        <% } %>
+                    <% } else { %>
+                        <div style="grid-column: span 2; padding: 100px; text-align: center; background: white; border-radius: var(--radius-lg); border: 1px dashed var(--nexus-border);">
+                            <h2 style="color: var(--text-light); margin-bottom: 10px;">No available tasks found</h2>
+                            <p style="color: var(--text-muted);">Check back later for new opportunities.</p>
                         </div>
-                        <div class="available-task-desc"><%= ((String)task.get("description")).length() > 100 ? ((String)task.get("description")).substring(0, 100) + "..." : task.get("description") %></div>
-                        <div class="available-task-meta">
-                            <span>📅 Due: <%= task.get("deadline") %></span>
-                            <span>⏰ <%= task.get("estimated_hours") %> hrs est.</span>
-                        </div>
-                        <div class="available-task-footer">
-                            <span class="task-priority priority-<%= task.get("priority") %>"><%= task.get("priority") %></span>
-                            <button class="btn-primary" style="padding: 0.25rem 0.75rem;" onclick="event.stopPropagation(); acceptTaskFromId(<%= task.get("id") %>, '<%= task.get("title") %>', <%= task.get("wage") %>, '<%= task.get("deadline") %>', '<%= task.get("description") %>')">Accept Task →</button>
-                        </div>
-                    </div>
-                    <% } %>
-                    <% if (availableTasks.isEmpty()) { %>
-                    <div style="text-align: center; padding: 60px; color: var(--text-muted); grid-column: 1/-1;">No available tasks at the moment. Check back later!</div>
                     <% } %>
                 </div>
             </div>
 
             <!-- My Tasks View -->
             <div id="myTasksView" class="page-section">
-                <div class="my-tasks-list" id="myTasksList">
-                    <% for (Map<String, Object> task : myTasks) { %>
-                    <div class="my-task-item" data-task-id="<%= task.get("id") %>">
-                        <div class="my-task-header">
-                            <span class="my-task-title"><%= task.get("title") %></span>
-                            <span class="deadline-countdown normal">📅 Status: <%= task.get("status") %></span>
-                        </div>
-                        <div class="task-description"><%= task.get("description") %></div>
-                        <div class="task-footer">
-                            <span>💰 $<%= task.get("wage") %></span>
-                            <div>
-                                <% if (!"pending".equals(task.get("submission_status"))) { %>
-                                <button class="btn-primary" style="padding: 0.25rem 0.75rem; margin-right: 0.5rem;" onclick="showSubmitWorkModal(<%= task.get("id") %>)">Submit Work</button>
-                                <% } else { %>
-                                <button class="btn-secondary" style="padding: 0.25rem 0.75rem; margin-right: 0.5rem;" disabled>Pending Review</button>
-                                <% } %>
-                                <button class="btn-secondary" style="padding: 0.25rem 0.75rem;" onclick="viewTaskDetails(<%= task.get("id") %>)">Details</button>
-                            </div>
-                        </div>
-                    </div>
-                    <% } %>
-                    <% if (myTasks.isEmpty()) { %>
-                    <div style="text-align: center; padding: 60px; color: var(--text-muted);">You haven't accepted any tasks yet. Browse available tasks to get started!</div>
-                    <% } %>
-                </div>
-            </div>
-
-            <!-- Earnings View -->
-            <div id="earningsView" class="page-section">
-                <div class="worker-stats-grid">
-                    <div class="worker-stat-card">
-                        <div class="worker-stat-header"><span class="worker-stat-icon">💰</span><span class="worker-stat-label">Total Earned</span></div>
-                        <div class="worker-stat-value">$<%= String.format("%,.0f", totalEarned) %></div>
-                    </div>
-                    <div class="worker-stat-card">
-                        <div class="worker-stat-header"><span class="worker-stat-icon">✅</span><span class="worker-stat-label">Tasks Completed</span></div>
-                        <div class="worker-stat-value"><%= tasksCompleted %></div>
-                    </div>
-                    <div class="worker-stat-card">
-                        <div class="worker-stat-header"><span class="worker-stat-icon">⭐</span><span class="worker-stat-label">Avg Rating</span></div>
-                        <div class="worker-stat-value"><%= String.format("%.1f", avgRating) %></div>
-                    </div>
-                    <div class="worker-stat-card">
-                        <div class="worker-stat-header"><span class="worker-stat-icon">⏳</span><span class="worker-stat-label">Pending Payment</span></div>
-                        <div class="worker-stat-value">$<%= String.format("%,.0f", pendingPayment) %></div>
-                    </div>
-                </div>
                 <div class="admin-card">
-                    <div class="admin-card-header"><h3>📜 Earnings Breakdown</h3></div>
-                    <div class="admin-card-body">
-                        <div class="earnings-timeline" id="earningsList">
-                            <% for (Map<String, Object> earning : earningsBreakdown) { %>
-                            <div class="earning-item">
-                                <div class="earning-info">
-                                    <h4>Monthly Summary</h4>
-                                    <p><%= earning.get("month") %></p>
-                                </div>
-                                <div class="earning-amount">$<%= earning.get("total_amount") %></div>
-                                <div class="earning-status paid"><%= earning.get("task_count") %> tasks</div>
-                            </div>
-                            <% } %>
-                            <% if (earningsBreakdown.isEmpty()) { %>
-                            <div style="text-align: center; padding: 40px; color: var(--text-muted);">No earnings data available yet</div>
-                            <% } %>
-                        </div>
+                    <div class="admin-card-header">
+                        <h3>📋 Assigned Deliverables</h3>
                     </div>
-                </div>
-            </div>
-
-            <!-- Payment History View -->
-            <div id="paymentHistoryView" class="page-section">
-                <div class="admin-card">
-                    <div class="admin-card-header"><h3>💰 Payment History</h3></div>
-                    <div class="admin-card-body">
+                    <div class="admin-card-body" style="padding: 0;">
                         <table class="admin-table">
                             <thead>
-                                <tr><th>Date</th><th>Description</th><th>Amount</th><th>Method</th><th>Transaction ID</th><th>Status</th></tr>
+                                <tr>
+                                    <th>Task Title</th>
+                                    <th>Deadline</th>
+                                    <th>Wage</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
                             </thead>
                             <tbody>
-                                <% for (Map<String, Object> payment : paymentHistory) { %>
-                                <tr>
-                                    <td><%= payment.get("payment_date") %></td>
-                                    <td><%= payment.get("description") != null ? payment.get("description") : "Payment" %></td>
-                                    <td>$${payment.get("amount")}</td>
-                                    <td><%= payment.get("payment_method") != null ? payment.get("payment_method") : "-" %></td>
-                                    <td class="text-muted"><%= payment.get("transaction_id") != null ? payment.get("transaction_id") : "-" %></td>
-                                    <td><span class="status-badge paid">Completed</span></td>
-                                </tr>
-                                <% } %>
-                                <% if (paymentHistory.isEmpty()) { %>
-                                <tr><td colspan="6" style="text-align: center;">No payment history available</td></tr>
+                                <% if (myTasks != null && !myTasks.isEmpty()) { %>
+                                    <% for (Map<String, Object> task : myTasks) { %>
+                                        <tr>
+                                            <td style="font-weight: 600;"><%= task.get("title") %></td>
+                                            <td><%= task.get("deadline") %></td>
+                                            <td style="font-family: 'JetBrains Mono'; font-weight: 700;"><%= cur.format(task.get("wage")) %></td>
+                                            <td>
+                                                <% String status = (String) task.get("status"); %>
+                                                <span class="status-badge <%= status.toLowerCase().replace(" ", "-") %>">
+                                                    <%= status %>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">Submit Work</button>
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; padding: 50px; color: var(--text-muted);">No tasks assigned to you.</td>
+                                    </tr>
                                 <% } %>
                             </tbody>
                         </table>
@@ -424,359 +394,145 @@
                 </div>
             </div>
 
-            <!-- Performance View -->
-            <div id="performanceView" class="page-section">
-                <div class="performance-grid">
-                    <div class="performance-card"><div class="performance-value"><%= tasksCompleted %></div><div class="performance-label">Tasks Completed</div></div>
-                    <div class="performance-card"><div class="performance-value"><%= String.format("%.1f", avgRating) %></div><div class="performance-label">Avg Rating ★</div></div>
-                    <div class="performance-card"><div class="performance-value"><%= tasksCompleted > 0 ? Math.round((double)tasksCompleted / (tasksCompleted + (myTasks.size() - tasksCompleted)) * 100) : 0 %>%</div><div class="performance-label">Completion Rate</div></div>
-                    <div class="performance-card"><div class="performance-value">0</div><div class="performance-label">Late Submissions</div></div>
-                </div>
+            <!-- Earnings View -->
+            <div id="earningsView" class="page-section">
                 <div class="admin-card">
-                    <div class="admin-card-header"><h3>⭐ Recent Ratings</h3></div>
+                    <div class="admin-card-header">
+                        <h3>💰 Monthly Earnings Summary</h3>
+                    </div>
                     <div class="admin-card-body">
-                        <div class="earnings-timeline" id="recentRatingsList">
-                            <% List<Map<String, Object>> ratings = taskDAO.getWorkerRatings(workerId);
-                               for (Map<String, Object> rating : ratings) { %>
-                            <div class="earning-item">
-                                <div class="earning-info">
-                                    <h4><%= rating.get("task_title") %></h4>
-                                    <p>Completed on <%= rating.get("reviewed_at") %></p>
-                                </div>
-                                <div class="rating-display">
-                                    <span class="rating-score"><%= rating.get("rating") %>.0</span>
-                                    <span><% for (int i = 1; i <= (int)rating.get("rating"); i++) { %>★<% } %><% for (int i = (int)rating.get("rating") + 1; i <= 5; i++) { %>☆<% } %></span>
+                        <% if (earningsHistory != null && !earningsHistory.isEmpty()) { %>
+                            <div class="metrics-panel" style="margin-bottom: 30px;">
+                                <% Map<String, Object> latest = earningsHistory.get(0); %>
+                                <div class="metric-card">
+                                    <div class="metric-label">Latest Period (<%= latest.get("month") %>)</div>
+                                    <div class="metric-value"><%= cur.format(latest.get("total_amount")) %></div>
                                 </div>
                             </div>
-                            <% } %>
-                            <% if (ratings.isEmpty()) { %>
-                            <div style="text-align: center; padding: 40px; color: var(--text-muted);">No ratings received yet</div>
-                            <% } %>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Activity View -->
-            <div id="activityView" class="page-section">
-                <div class="admin-card">
-                    <div class="admin-card-header"><h3>🔥 Weekly Activity</h3></div>
-                    <div class="admin-card-body">
-                        <div class="heatmap" id="activityHeatmap"></div>
-                        <div class="earnings-timeline" style="margin-top: 24px;" id="activityLog">
-                            <!-- Activity log will be loaded via AJAX -->
-                            <div style="text-align: center; padding: 20px; color: var(--text-muted);">Loading activity...</div>
-                        </div>
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Period (Month)</th>
+                                        <th>Tasks Completed</th>
+                                        <th>Total Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% for (Map<String, Object> entry : earningsHistory) { %>
+                                        <tr>
+                                            <td style="font-weight: 600;"><%= entry.get("month") %></td>
+                                            <td><%= entry.get("task_count") %></td>
+                                            <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--nexus-success);">
+                                                <%= cur.format(entry.get("total_amount")) %>
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        <% } else { %>
+                            <div style="padding: 100px; text-align: center;">
+                                <p style="color: var(--text-muted);">No earnings data available yet.</p>
+                            </div>
+                        <% } %>
                     </div>
                 </div>
             </div>
 
             <!-- Profile View -->
             <div id="profileView" class="page-section">
-                <div class="admin-card" style="max-width: 600px; margin: 0 auto;">
-                    <div class="admin-card-header"><h3>👤 My Profile</h3></div>
+                <div class="admin-card" style="max-width: 700px; margin: 0 auto;">
+                    <div class="admin-card-header">
+                        <h3>👤 My Professional Profile</h3>
+                    </div>
                     <div class="admin-card-body">
-                        <form id="profileForm" action="${pageContext.request.contextPath}/UpdateProfileServlet" method="POST">
-                            <div style="text-align: center; margin-bottom: 24px;">
-                                <div class="admin-avatar" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto; background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; display: flex; align-items: center; justify-content: center; border-radius: 16px;">
-                                    <%= currentUser.getFullName().charAt(0) %>
-                                </div>
-                                <h3 style="margin-top: 16px;"><%= currentUser.getFullName() %></h3>
-                                <p class="text-muted">Worker since <%= currentUser.getCreatedAt() != null ? currentUser.getCreatedAt().toString().substring(0, 10) : "2025" %></p>
-                            </div>
+                        <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label">Full Name</label>
-                                <input type="text" class="input-field" name="fullName" value="<%= currentUser.getFullName() %>">
+                                <input type="text" class="input-field" value="<%= currentUser.getFullName() %>" readonly>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="input-field" name="email" value="<%= currentUser.getEmail() %>">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="input-field" value="<%= currentUser.getUsername() %>" readonly>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" class="input-field" value="<%= currentUser.getEmail() %>" readonly>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Phone</label>
-                                <input type="tel" class="input-field" name="phone" value="<%= currentUser.getPhone() != null ? currentUser.getPhone() : "" %>">
+                                <label class="form-label">Phone Number</label>
+                                <input type="text" class="input-field" value="<%= currentUser.getPhone() != null ? currentUser.getPhone() : "Not provided" %>" readonly>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Skills</label>
-                                <input type="text" class="input-field" name="skills" value="<%= currentUser.getSkills() != null ? currentUser.getSkills() : "" %>" placeholder="Web Design, UI/UX, Figma">
-                            </div>
-                            <div style="display: flex; gap: 12px;">
-                                <button type="submit" class="btn-primary">Save Changes</button>
-                                <button type="button" class="btn-secondary" onclick="showChangePasswordModal()">Change Password</button>
-                            </div>
-                        </form>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Core Skills</label>
+                            <textarea class="textarea-field" readonly><%= currentUser.getSkills() != null ? currentUser.getSkills() : "No skills listed." %></textarea>
+                        </div>
+                        <div style="margin-top: 20px; padding: 15px; background: var(--nexus-accent-light); border-radius: var(--radius-md); border: 1px solid var(--nexus-accent);">
+                            <p style="font-size: 13px; color: var(--text-secondary);">
+                                <strong>Account Status:</strong> <span class="status-badge approved"><%= currentUser.getStatus() %></span>
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Submit Work Modal -->
-    <div id="submitWorkModal" class="modal-overlay">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h3 id="submitTaskTitle">Submit Work</h3>
-                <button class="modal-close" onclick="closeModal('submitWorkModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="submitForm" action="${pageContext.request.contextPath}/SubmitWorkServlet" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="taskId" id="submitTaskId">
-                    <div class="form-group">
-                        <label class="form-label">Work Description / Notes *</label>
-                        <textarea class="textarea-field" name="submissionText" id="workDescription" rows="5" placeholder="Describe what you've completed. Include details about your work..." required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Hours Worked (if hourly)</label>
-                        <input type="number" step="0.5" class="input-field" name="hoursWorked" placeholder="0.00">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Attach Proof</label>
-                        <div class="file-upload" onclick="document.getElementById('proofFile').click()">
-                            <span>📎 Click to upload files</span>
-                            <input type="file" name="attachment" id="proofFile" style="display: none;" onchange="updateFileName(this)">
-                        </div>
-                        <div class="file-name" id="fileName">No files selected</div>
-                    </div>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
-                        <button type="button" class="btn-secondary" onclick="closeModal('submitWorkModal')">Cancel</button>
-                        <button type="submit" class="btn-primary">Submit Work</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Change Password Modal -->
-    <div id="changePasswordModal" class="modal-overlay">
-        <div class="modal-container">
-            <div class="modal-header">
-                <h3>Change Password</h3>
-                <button class="modal-close" onclick="closeModal('changePasswordModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="passwordForm" action="${pageContext.request.contextPath}/ChangePasswordServlet" method="POST">
-                    <div class="form-group">
-                        <label class="form-label">Current Password</label>
-                        <input type="password" class="input-field" name="currentPassword" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">New Password</label>
-                        <input type="password" class="input-field" name="newPassword" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Confirm New Password</label>
-                        <input type="password" class="input-field" name="confirmPassword" required>
-                    </div>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
-                        <button type="button" class="btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
-                        <button type="submit" class="btn-primary">Update Password</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // Task data from server
-        const availableTasksData = <%= new com.google.gson.Gson().toJson(availableTasks) %>;
-        const myTasksData = <%= new com.google.gson.Gson().toJson(myTasks) %>;
-        let currentTaskId = null;
-        
-        // Render available tasks with filters
-        function renderAvailableTasks() {
-            const grid = document.getElementById('availableTasksGrid');
-            const typeFilter = document.getElementById('taskTypeFilter').value;
-            const sortBy = document.getElementById('sortByFilter').value;
-            const searchTerm = document.getElementById('availableTaskSearch').value.toLowerCase();
-            
-            let filtered = availableTasksData.filter(task => {
-                if (typeFilter !== 'all' && task.wageType !== typeFilter) return false;
-                if (searchTerm && !task.title.toLowerCase().includes(searchTerm)) return false;
-                return true;
+        function switchToPage(pageId) {
+            // Hide all sections
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
             });
             
-            if (sortBy === 'highest') filtered.sort((a,b) => b.wage - a.wage);
-            else if (sortBy === 'deadline') filtered.sort((a,b) => new Date(a.deadline) - new Date(b.deadline));
-            
-            if (filtered.length === 0) {
-                grid.innerHTML = '<div style="text-align: center; padding: 60px; color: var(--text-muted); grid-column: 1/-1;">No tasks match your filters</div>';
-                return;
+            // Show target section
+            const targetSection = document.getElementById(pageId + 'View');
+            if (targetSection) {
+                targetSection.classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
             
-            grid.innerHTML = filtered.map(task => `
-                <div class="available-task-card" onclick="acceptTaskFromId(${task.id}, '${task.title}', ${task.wage}, '${task.deadline}', '${task.description.replace(/'/g, "\\'")}')">
-                    <div class="available-task-header">
-                        <span class="available-task-title">${task.title}</span>
-                        <span class="available-task-wage">$${task.wage}/${task.wageType}</span>
-                    </div>
-                    <div class="available-task-desc">${task.description.substring(0, 100)}${task.description.length > 100 ? '...' : ''}</div>
-                    <div class="available-task-meta">
-                        <span>📅 Due: ${task.deadline}</span>
-                        <span>⏰ ${task.estimatedHours || 0} hrs est.</span>
-                    </div>
-                    <div class="available-task-footer">
-                        <span class="task-priority priority-${task.priority}">${task.priority}</span>
-                        <button class="btn-primary" style="padding: 0.25rem 0.75rem;" onclick="event.stopPropagation(); acceptTaskFromId(${task.id}, '${task.title}', ${task.wage}, '${task.deadline}', '${task.description.replace(/'/g, "\\'")}')">Accept Task →</button>
-                    </div>
-                </div>
-            `).join('');
-            document.getElementById('availableTasksBadge').textContent = filtered.length;
-        }
-        
-        // Accept task from ID
-        function acceptTaskFromId(taskId, title, wage, deadline, description) {
-            if (confirm(`Accept "${title}"? Wage: $${wage}. Deadline: ${deadline}`)) {
-                fetch('${pageContext.request.contextPath}/AcceptTaskServlet', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'taskId=' + taskId
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        showToast(`Task "${title}" accepted!`, 'success');
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        showToast(result.message || 'Failed to accept task', 'error');
-                    }
-                })
-                .catch(error => {
-                    showToast('Error accepting task', 'error');
-                });
-            }
-        }
-        
-        // Show submit work modal
-        function showSubmitWorkModal(taskId) {
-            currentTaskId = taskId;
-            document.getElementById('submitTaskId').value = taskId;
-            document.getElementById('submitTaskTitle').textContent = `Submit Work for Task #${taskId}`;
-            document.getElementById('workDescription').value = '';
-            document.getElementById('fileName').textContent = 'No files selected';
-            document.getElementById('submitWorkModal').classList.add('active');
-        }
-        
-        // Update file name display
-        function updateFileName(input) {
-            document.getElementById('fileName').textContent = input.files.length + ' file(s) selected';
-        }
-        
-        // View task details
-        function viewTaskDetails(taskId) {
-            const task = myTasksData.find(t => t.id == taskId);
-            if (task) {
-                showToast(`Task: ${task.title}`, 'info');
-            }
-        }
-        
-        // Show change password modal
-        function showChangePasswordModal() {
-            document.getElementById('changePasswordModal').classList.add('active');
-        }
-        
-        // Page switching
-        function switchToPage(page) {
-            document.querySelectorAll('.page-section').forEach(section => section.classList.remove('active'));
-            document.getElementById(page + 'View').classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+            // Update sidebar active state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
             
+            const activeItem = document.querySelector(`.nav-item[onclick*="${pageId}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
+            
+            // Update page titles
             const titles = {
-                dashboard: { title: 'Worker Dashboard', subtitle: 'Welcome back, <%= currentUser.getFullName() %>! Track your tasks and earnings.' },
-                'available-tasks': { title: 'Available Tasks', subtitle: 'Find and accept tasks that match your skills.' },
-                'my-tasks': { title: 'My Tasks', subtitle: 'Track your active tasks and submit work.' },
-                earnings: { title: 'My Earnings', subtitle: 'Track your income and payment status.' },
-                'payment-history': { title: 'Payment History', subtitle: 'View all your past payments.' },
-                performance: { title: 'My Performance', subtitle: 'See your ratings and performance metrics.' },
-                activity: { title: 'Activity Log', subtitle: 'Track your work activity and submissions.' },
-                profile: { title: 'My Profile', subtitle: 'Manage your personal information.' }
+                'dashboard': 'Worker Dashboard',
+                'available-tasks': 'Available Tasks',
+                'my-tasks': 'Assigned Deliverables',
+                'earnings': 'Earnings History',
+                'profile': 'My Professional Profile'
             };
             
-            const current = titles[page] || titles.dashboard;
-            document.getElementById('pageTitle').textContent = current.title;
-            document.getElementById('pageSubtitle').textContent = current.subtitle;
+            const subtitles = {
+                'dashboard': 'Welcome back, <%= currentUser.getFullName().split(" ")[0] %>! Track your tasks and performance.',
+                'available-tasks': 'Discover new high-velocity contracts tailored to your expertise.',
+                'my-tasks': 'Manage and submit your currently assigned project nodes.',
+                'earnings': 'Direct oversight of your financial throughput and project payouts.',
+                'profile': 'Configure your professional data and security protocols.'
+            };
             
-            if (page === 'available-tasks') renderAvailableTasks();
-            else if (page === 'activity') loadActivity();
+            document.getElementById('pageTitle').textContent = titles[pageId] || 'Nexus Portal';
+            document.getElementById('pageSubtitle').textContent = subtitles[pageId] || 'Operational Node';
         }
         
-        // Load activity data
-        function loadActivity() {
-            fetch('${pageContext.request.contextPath}/GetActivityServlet')
-                .then(response => response.json())
-                .then(data => {
-                    // Render heatmap
-                    const heatmap = document.getElementById('activityHeatmap');
-                    if (data.heatmap) {
-                        heatmap.innerHTML = data.heatmap.map(level => `<div class="heatmap-day level-${level}"></div>`).join('');
-                    }
-                    
-                    // Render activity log
-                    const logContainer = document.getElementById('activityLog');
-                    if (data.activities && data.activities.length > 0) {
-                        logContainer.innerHTML = data.activities.map(activity => `
-                            <div class="earning-item">
-                                <div class="earning-info">
-                                    <h4>${activity.title}</h4>
-                                    <p>${activity.date}</p>
-                                </div>
-                                <div class="earning-status ${activity.type}">${activity.status}</div>
-                            </div>
-                        `).join('');
-                    } else {
-                        logContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No recent activity</div>';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('activityLog').innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Unable to load activity data</div>';
-                });
-        }
-        
-        // Toast notification
-        function showToast(message, type = 'info') {
-            let container = document.querySelector('.toast-container');
-            if (!container) {
-                container = document.createElement('div');
-                container.className = 'toast-container';
-                container.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 1000;';
-                document.body.appendChild(container);
+        // Initial setup
+        window.onload = function() {
+            // Check for success/error messages in URL if needed
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('success')) {
+                showAlert('alertContainer', urlParams.get('success'), 'success');
             }
-            const toast = document.createElement('div');
-            toast.className = `alert alert-${type}`;
-            toast.style.cssText = 'margin-bottom: 10px; animation: slideIn 0.3s ease; cursor: pointer;';
-            toast.innerHTML = `<span>${type === 'success' ? '✓' : (type === 'error' ? '⚠️' : 'ℹ️')}</span><span>${message}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
-            toast.onclick = () => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); };
-        }
-        
-        function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
-        
-        // Mobile sidebar toggle
-        document.getElementById('sidebarToggle').addEventListener('click', () => { document.getElementById('sidebar').classList.toggle('open'); });
-        document.addEventListener('click', (e) => { const sidebar = document.getElementById('sidebar'); const toggle = document.getElementById('sidebarToggle'); if (window.innerWidth <= 768 && sidebar.classList.contains('open') && !sidebar.contains(e.target) && !toggle.contains(e.target)) sidebar.classList.remove('open'); });
-        
-        // Filter event listeners
-        document.getElementById('taskTypeFilter')?.addEventListener('change', renderAvailableTasks);
-        document.getElementById('sortByFilter')?.addEventListener('change', renderAvailableTasks);
-        document.getElementById('availableTaskSearch')?.addEventListener('input', renderAvailableTasks);
-        
-        // Sidebar navigation
-        document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
-                switchToPage(this.getAttribute('data-page'));
-            });
-        });
-        
-        // Initial render
-        renderAvailableTasks();
-        
-        // Show success message if redirected
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('success') === 'submitted') {
-            showToast('Work submitted successfully! Waiting for admin approval.', 'success');
-        }
+        };
     </script>
 </body>
 </html>

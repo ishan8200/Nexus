@@ -54,6 +54,9 @@ public class AdminController extends HttpServlet {
         List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5);
         List<Map<String, Object>> pendingWorkersList = userDAO.getPendingWorkersList();
         List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList();
+        List<Map<String, Object>> allWorkers = userDAO.getAllWorkersWithStats();
+        List<Map<String, Object>> allTasks = taskDAO.getAllTasks();
+        List<Map<String, Object>> wageSummary = wageDAO.getWageSummary();
         
         request.setAttribute("totalTasks", totalTasks);
         request.setAttribute("completedTasks", completedTasks);
@@ -63,6 +66,9 @@ public class AdminController extends HttpServlet {
         request.setAttribute("recentTasks", recentTasks);
         request.setAttribute("pendingWorkersList", pendingWorkersList);
         request.setAttribute("pendingSubmissionsList", pendingSubmissionsList);
+        request.setAttribute("allWorkers", allWorkers);
+        request.setAttribute("allTasks", allTasks);
+        request.setAttribute("wageSummary", wageSummary);
         request.setAttribute("currentUser", currentUser);
         
         request.getRequestDispatcher("/WEB-INF/pages/adminDash.jsp").forward(request, response);

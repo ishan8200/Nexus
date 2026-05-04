@@ -11,38 +11,31 @@ import java.util.List;
 import java.util.Map;
 
 import org.mindrot.jbcrypt.BCrypt;
-
-import com.nex.model.User;
 import com.nex.config.DBConnection;
+import com.nex.model.User;
 
 /**
  * UserDAO handles all database operations for the User model.
  * Includes methods for authentication, user management, and worker statistics.
- * Uses BCrypt for secure password hashing.
  */
 
 public class UserDAO {
     
     // ==================== USER REGISTRATION & AUTHENTICATION ====================
     
-    /**
-     * Register a new user with BCrypt hashed password
-     */
     public boolean registerUser(User user) {
         String sql = "INSERT INTO users (username, email, password, full_name, phone, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            // Hash the password using BCrypt
-            String hashedPassword = BCrypt.hashpw(user.getPassword(), BCrypt.gensalt());
-            
             pstmt.setString(1, user.getUsername());
             pstmt.setString(2, user.getEmail());
-            pstmt.setString(3, hashedPassword);  // Store hashed password
+            // Hash password using BCrypt
+            pstmt.setString(3, BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
             pstmt.setString(4, user.getFullName());
             pstmt.setString(5, user.getPhone());
             pstmt.setString(6, user.getRole());
-            pstmt.setString(7, "pending");
+            pstmt.setString(7, user.getStatus() != null ? user.getStatus() : "pending");
             
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -52,7 +45,7 @@ public class UserDAO {
     }
     
     /**
-     * Validate user credentials for login using EMAIL with BCrypt verification
+     * Validate user credentials for login using EMAIL
      */
     public User loginUser(String email, String password) {
         String sql = "SELECT * FROM users WHERE email = ?";
@@ -63,12 +56,9 @@ public class UserDAO {
             ResultSet rs = pstmt.executeQuery();
             
             if (rs.next()) {
-                String hashedPassword = rs.getString("password");
-                // Verify password using BCrypt
-                if (BCrypt.checkpw(password, hashedPassword)) {
-                    User user = extractUserFromResultSet(rs);
-                    updateLastLogin(user.getId());
-                    return user;
+                // Use BCrypt to verify password
+                if (BCrypt.checkpw(password, rs.getString("password"))) {
+                    return extractUserFromResultSet(rs);
                 }
             }
         } catch (SQLException e) {
@@ -77,9 +67,6 @@ public class UserDAO {
         return null;
     }
     
-    /**
-     * Check if username exists
-     */
     public boolean isUsernameExists(String username) {
         String sql = "SELECT id FROM users WHERE username = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -93,9 +80,6 @@ public class UserDAO {
         }
     }
     
-    /**
-     * Check if email exists
-     */
     public boolean isEmailExists(String email) {
         String sql = "SELECT id FROM users WHERE email = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -109,11 +93,8 @@ public class UserDAO {
         }
     }
     
-    /**
-     * Update last login timestamp
-     */
     public void updateLastLogin(int userId) {
-        String sql = "UPDATE users SET last_login = NOW() WHERE id = ?";
+        String sql = "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, userId);
@@ -123,11 +104,12 @@ public class UserDAO {
         }
     }
     
+    
+    
+ 
+    
     // ==================== USER MANAGEMENT ====================
     
-    /**
-     * Get user by ID
-     */
     public User getUserById(int id) {
         String sql = "SELECT * FROM users WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -143,27 +125,6 @@ public class UserDAO {
         return null;
     }
     
-    /**
-     * Get user by email
-     */
-    public User getUserByEmail(String email) {
-        String sql = "SELECT * FROM users WHERE email = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, email);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                return extractUserFromResultSet(rs);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-    
-    /**
-     * Get all workers
-     */
     public List<User> getAllWorkers() {
         List<User> workers = new ArrayList<>();
         String sql = "SELECT * FROM users WHERE role = 'worker' ORDER BY created_at DESC";
@@ -179,9 +140,6 @@ public class UserDAO {
         return workers;
     }
     
-    /**
-     * Get all workers with statistics
-     */
     public List<Map<String, Object>> getAllWorkersWithStats() {
         List<Map<String, Object>> workers = new ArrayList<>();
         String sql = "SELECT u.*, COUNT(DISTINCT t.id) as tasks_completed_count " +
@@ -214,9 +172,6 @@ public class UserDAO {
         return workers;
     }
     
-    /**
-     * Get active worker count
-     */
     public int getActiveWorkerCount() {
         String sql = "SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'approved'";
         try (Connection conn = DBConnection.getConnection();
@@ -229,9 +184,6 @@ public class UserDAO {
         return 0;
     }
     
-    /**
-     * Get pending worker count
-     */
     public int getPendingWorkerCount() {
         String sql = "SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'pending'";
         try (Connection conn = DBConnection.getConnection();
@@ -244,9 +196,6 @@ public class UserDAO {
         return 0;
     }
     
-    /**
-     * Get pending workers list
-     */
     public List<Map<String, Object>> getPendingWorkersList() {
         List<Map<String, Object>> workers = new ArrayList<>();
         String sql = "SELECT id, full_name, email, phone, skills, created_at FROM users WHERE role = 'worker' AND status = 'pending' ORDER BY created_at DESC";
@@ -269,9 +218,6 @@ public class UserDAO {
         return workers;
     }
     
-    /**
-     * Update worker status (approve/reject/block)
-     */
     public boolean updateWorkerStatus(int userId, String status) {
         String sql = "UPDATE users SET status = ? WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -285,9 +231,6 @@ public class UserDAO {
         }
     }
     
-    /**
-     * Update user profile
-     */
     public boolean updateUserProfile(User user) {
         String sql = "UPDATE users SET full_name = ?, phone = ?, skills = ? WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
@@ -303,16 +246,12 @@ public class UserDAO {
         }
     }
     
-    /**
-     * Change user password with BCrypt hashing
-     */
     public boolean changePassword(int userId, String newPassword) {
-        // Hash the new password
-        String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
         String sql = "UPDATE users SET password = ? WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, hashedPassword);
+            // Hash new password using BCrypt
+            pstmt.setString(1, BCrypt.hashpw(newPassword, BCrypt.gensalt()));
             pstmt.setInt(2, userId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -321,51 +260,8 @@ public class UserDAO {
         }
     }
     
-    /**
-     * Validate current password for a user (useful before changing password)
-     */
-    public boolean validateCurrentPassword(int userId, String currentPassword) {
-        String sql = "SELECT password FROM users WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, userId);
-            ResultSet rs = pstmt.executeQuery();
-            if (rs.next()) {
-                String hashedPassword = rs.getString("password");
-                return BCrypt.checkpw(currentPassword, hashedPassword);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-    
-    /**
-     * Get workers for dropdown (simple list)
-     */
-    public List<Map<String, Object>> getWorkersForDropdown() {
-        List<Map<String, Object>> workers = new ArrayList<>();
-        String sql = "SELECT id, full_name as name FROM users WHERE role = 'worker' AND status = 'approved' ORDER BY full_name";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                Map<String, Object> worker = new HashMap<>();
-                worker.put("id", rs.getInt("id"));
-                worker.put("name", rs.getString("name"));
-                workers.add(worker);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return workers;
-    }
-    
     // ==================== WORKER STATISTICS ====================
     
-    /**
-     * Get worker statistics using stored procedure
-     */
     public Map<String, Object> getWorkerStats(int workerId) {
         Map<String, Object> stats = new HashMap<>();
         String sql = "{CALL GetWorkerStats(?)}";
@@ -385,9 +281,6 @@ public class UserDAO {
         return stats;
     }
     
-    /**
-     * Get worker earnings breakdown by month
-     */
     public List<Map<String, Object>> getWorkerEarnings(int workerId) {
         List<Map<String, Object>> earnings = new ArrayList<>();
         String sql = "{CALL GetWorkerEarnings(?)}";
@@ -408,9 +301,6 @@ public class UserDAO {
         return earnings;
     }
     
-    /**
-     * Get worker's assigned tasks
-     */
     public List<Map<String, Object>> getMyTasks(int workerId) {
         List<Map<String, Object>> tasks = new ArrayList<>();
         String sql = "SELECT t.*, ts.status as submission_status " +
@@ -444,9 +334,6 @@ public class UserDAO {
     
     // ==================== HELPER METHODS ====================
     
-    /**
-     * Extract User object from ResultSet
-     */
     private User extractUserFromResultSet(ResultSet rs) throws SQLException {
         User user = new User();
         user.setId(rs.getInt("id"));

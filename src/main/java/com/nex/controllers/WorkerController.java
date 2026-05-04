@@ -51,6 +51,7 @@ public class WorkerController extends HttpServlet {
         Map<String, Object> stats = userDAO.getWorkerStats(currentUser.getId());
         List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks();
         List<Map<String, Object>> myTasks = userDAO.getMyTasks(currentUser.getId());
+        List<Map<String, Object>> earningsHistory = userDAO.getWorkerEarnings(currentUser.getId());
         
         request.setAttribute("totalEarned", stats.get("total_earned"));
         request.setAttribute("tasksCompleted", stats.get("tasks_completed"));
@@ -58,6 +59,7 @@ public class WorkerController extends HttpServlet {
         request.setAttribute("pendingPayment", stats.get("pending_payment"));
         request.setAttribute("availableTasks", availableTasks);
         request.setAttribute("myTasks", myTasks);
+        request.setAttribute("earningsHistory", earningsHistory);
         request.setAttribute("currentUser", currentUser);
         
         request.getRequestDispatcher("/WEB-INF/pages/workerDash.jsp").forward(request, response);

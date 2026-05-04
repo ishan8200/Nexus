@@ -9,7 +9,7 @@ import java.io.IOException;
  * AuthFilter intercepts all requests directed to protected resources like /home.
  * It checks if a session exists and if a user is logged in.
  */
-@WebFilter("/home")
+@WebFilter({"/home", "/admin", "/worker"})
 public class AuthFilter implements Filter {
 
     @Override
@@ -29,7 +29,7 @@ public class AuthFilter implements Filter {
             chain.doFilter(request, response);
         } else {
             // User is not authenticated, redirect back to login page
-            res.sendRedirect("login");
+            res.sendRedirect(req.getContextPath() + "/login");
         }
     }
 

@@ -39,7 +39,7 @@
             <div class="register-card">
                 <div id="alertContainer"></div>
 
-                <form id="registerForm">
+<form id="registerForm" method="post" action="${pageContext.request.contextPath}/register">
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Full Name *</label>
@@ -137,13 +137,20 @@
                 </div>
 
                 <div class="login-section">
-                    <p><a href="#" class="login-link">Sign in to your account →</a></p>
+                <a href="${pageContext.request.contextPath}/login" class="login-link">Sign in to your account →</a>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Check for server-side error messages
+        window.onload = function() {
+            <% if (request.getAttribute("error") != null) { %>
+                showAlert('alertContainer', '<%= request.getAttribute("error") %>', 'error');
+            <% } %>
+        };
+
         // DOM Elements
         const togglePassword = document.getElementById('togglePassword');
         const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
@@ -210,10 +217,29 @@
 
         // Form submission
         form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            // validation code using showAlert('alertContainer', msg, type);
-            // ... rest of submission logic using showAlert('alertContainer', message, type)
-            // For brevity, the full form validation is preserved but now uses the external showAlert
+            // Full validation here - preventDefault ONLY on client errors
+            const fullName = document.getElementById('fullName').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const role = document.querySelector('input[name="role"]:checked');
+            const termsCheckbox = document.getElementById('termsCheckbox').checked;
+
+            // Validation checks
+            if (!fullName) { showAlert('alertContainer', 'Full name is required', 'error'); e.preventDefault(); return; }
+            if (!username || !/^[a-zA-Z0-9_]+$/.test(username)) { showAlert('alertContainer', 'Valid username required (letters, numbers, _)', 'error'); e.preventDefault(); return; }
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('alertContainer', 'Valid email required', 'error'); e.preventDefault(); return; }
+            if (password.length < 6 || !/\d/.test(password)) { showAlert('alertContainer', 'Password: 6+ chars with number', 'error'); e.preventDefault(); return; }
+            if (password !== confirmPassword) { showAlert('alertContainer', 'Passwords do not match', 'error'); e.preventDefault(); return; }
+            if (!role) { showAlert('alertContainer', 'Select role (employer/worker)', 'error'); e.preventDefault(); return; }
+            if (!termsCheckbox) { showAlert('alertContainer', 'Accept terms required', 'error'); e.preventDefault(); return; }
+
+            // All good - show loading, submit to server /register servlet
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner"></div> Creating Account...';
         });
 
         console.log('Register page loaded');

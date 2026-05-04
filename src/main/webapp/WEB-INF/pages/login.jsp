@@ -76,7 +76,7 @@
 
                     <div class="form-options">
                         <label class="checkbox">
-                            <input type="checkbox" checked>
+                            <input type="checkbox" name="rememberMe" checked>
                             <span>Remember me</span>
                         </label>
                         <a href="#" class="forgot-link">Forgot password?</a>
@@ -100,6 +100,17 @@
     </div>
 
     <script>
+        // Check for server-side error or success messages
+        window.onload = function() {
+            <% if (request.getAttribute("error") != null) { %>
+                showAlert('alertContainer', '<%= request.getAttribute("error") %>', 'error');
+            <% } %>
+            
+            <% if (request.getParameter("success") != null) { %>
+                showAlert('alertContainer', '<%= request.getParameter("success") %>', 'success');
+            <% } %>
+        };
+
         // Toggle password visibility
         const togglePassword = document.getElementById('togglePassword');
         const passwordInput = document.getElementById('password');
