@@ -29,12 +29,15 @@ public class CreateTaskServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
         
+        response.setContentType("application/json");
+        java.io.PrintWriter out = response.getWriter();
+        
         HttpSession session = request.getSession(false);
         User currentUser = (session != null) ? (User) session.getAttribute("user") : null;
         
         // Security check
         if (currentUser == null || !"admin".equals(currentUser.getRole())) {
-            response.sendRedirect(request.getContextPath() + "/login");
+            out.print("{\"success\": false, \"message\": \"Unauthorized access\"}");
             return;
         }
 
@@ -67,14 +70,14 @@ public class CreateTaskServlet extends HttpServlet {
             boolean success = taskDAO.createTask(task);
             
             if (success) {
-                response.sendRedirect(request.getContextPath() + "/admin?success=" + java.net.URLEncoder.encode("Mission deployed successfully!", "UTF-8"));
+                out.print("{\"success\": true, \"message\": \"Mission deployed successfully!\"}");
             } else {
-                response.sendRedirect(request.getContextPath() + "/admin?error=" + java.net.URLEncoder.encode("Failed to deploy mission. System error.", "UTF-8"));
+                out.print("{\"success\": false, \"message\": \"Failed to deploy mission. System error.\"}");
             }
             
         } catch (Exception e) {
             e.printStackTrace();
-            response.sendRedirect(request.getContextPath() + "/admin?error=" + java.net.URLEncoder.encode("Invalid input data.", "UTF-8"));
+            out.print("{\"success\": false, \"message\": \"Invalid input data: " + e.getMessage() + "\"}");
         }
     }
 }

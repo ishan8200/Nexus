@@ -274,100 +274,39 @@ public class TaskDAO {
         }
     }
     
-    public boolean processSubmissionApproval(int submissionId, int reviewedBy, int rating, String comment) {
-        Connection conn = null;
-        try {
-            conn = DBConnection.getConnection();
-            conn.setAutoCommit(false);
-
-            // 1. Get submission details (task_id, worker_id, and the current wage for that task)
-            int taskId = -1;
-            int workerId = -1;
-            double wage = 0;
-            String getSubSql = "SELECT ts.task_id, ts.worker_id, t.wage FROM task_submissions ts JOIN tasks t ON ts.task_id = t.id WHERE ts.id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(getSubSql)) {
-                pstmt.setInt(1, submissionId);
-                ResultSet rs = pstmt.executeQuery();
-                if (rs.next()) {
-                    taskId = rs.getInt("task_id");
-                    workerId = rs.getInt("worker_id");
-                    wage = rs.getDouble("wage");
-                } else {
-                    return false;
-                }
-            }
-
-            // 2. Update submission status
-            String updateSubSql = "UPDATE task_submissions SET status = 'approved', rating = ?, admin_comment = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(updateSubSql)) {
-                pstmt.setInt(1, rating);
-                pstmt.setString(2, comment);
-                pstmt.setInt(3, reviewedBy);
-                pstmt.setInt(4, submissionId);
-                pstmt.executeUpdate();
-            }
-
-            // 3. Update task status to completed
-            String updateTaskSql = "UPDATE tasks SET status = 'completed' WHERE id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(updateTaskSql)) {
-                pstmt.setInt(1, taskId);
-                pstmt.executeUpdate();
-            }
-
-            // 4. Create wage record (credited to worker, but pending disbursement)
-            String createWageSql = "INSERT INTO wages (worker_id, task_id, submission_id, amount, status) VALUES (?, ?, ?, ?, 'pending')";
-            try (PreparedStatement pstmt = conn.prepareStatement(createWageSql)) {
-                pstmt.setInt(1, workerId);
-                pstmt.setInt(2, taskId);
-                pstmt.setInt(3, submissionId);
-                pstmt.setDouble(4, wage);
-                pstmt.executeUpdate();
-            }
-            
-            // 5. Update worker profile statistics
-            String updateWorkerSql = "UPDATE users SET tasks_completed = tasks_completed + 1 WHERE id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(updateWorkerSql)) {
-                pstmt.setInt(1, workerId);
-                pstmt.executeUpdate();
-            }
-
-            conn.commit();
-            return true;
-        } catch (SQLException e) {
-            if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
-            }
-            e.printStackTrace();
-            return false;
-        } finally {
-            if (conn != null) {
-                try { conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+   public boolean processSubmissionApproval(int assignmentId, int reviewedBy, int rating, String comment) {
+    String sql = "{CALL ApproveTaskWork(?, ?, ?)}";
+    try (Connection conn = DBConnection.getConnection();
+         CallableStatement cstmt = conn.prepareCall(sql)) {
+        cstmt.setInt(1, assignmentId);
+        cstmt.setInt(2, rating);
+        cstmt.setString(3, comment);
+        
+        // Execute and check if successful
+        boolean hasResult = cstmt.execute();
+        // The stored procedure returns a result set with success field
+        if (hasResult) {
+            ResultSet rs = cstmt.getResultSet();
+            if (rs.next()) {
+                return rs.getInt("success") == 1;
             }
         }
+        return true; // If no result set, assume success if no exception
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
     }
-
-    public boolean approveSubmission(int submissionId, int reviewedBy, int rating, String comment) {
-        String sql = "UPDATE task_submissions SET status = 'approved', rating = ?, admin_comment = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, rating);
-            pstmt.setString(2, comment);
-            pstmt.setInt(3, reviewedBy);
-            pstmt.setInt(4, submissionId);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+}
+    public boolean approveSubmission(int assignmentId, int reviewedBy, int rating, String comment) {
+        return processSubmissionApproval(assignmentId, reviewedBy, rating, comment);
     }
     
-    public boolean rejectSubmission(int submissionId, int reviewedBy, String comment) {
-        String sql = "UPDATE task_submissions SET status = 'rejected', admin_comment = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ?";
+    public boolean rejectSubmission(int assignmentId, int reviewedBy, String comment) {
+        String sql = "UPDATE task_assignments SET status = 'rejected', admin_feedback = ?, completed_at = NOW() WHERE id = ? AND status = 'submitted'";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, comment);
-            pstmt.setInt(2, reviewedBy);
-            pstmt.setInt(3, submissionId);
+            pstmt.setInt(2, assignmentId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -376,7 +315,7 @@ public class TaskDAO {
     }
     
     public int getPendingSubmissionCount() {
-        String sql = "SELECT COUNT(*) FROM task_submissions WHERE status = 'pending'";
+        String sql = "SELECT COUNT(*) FROM task_assignments WHERE status = 'submitted'";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
@@ -389,12 +328,13 @@ public class TaskDAO {
     
     public List<Map<String, Object>> getPendingSubmissionsList() {
         List<Map<String, Object>> submissions = new ArrayList<>();
-        String sql = "SELECT ts.*, u.full_name as worker_name, t.title as task_title " +
-                     "FROM task_submissions ts " +
-                     "JOIN users u ON ts.worker_id = u.id " +
-                     "JOIN tasks t ON ts.task_id = t.id " +
-                     "WHERE ts.status = 'pending' " +
-                     "ORDER BY ts.submitted_at DESC";
+        String sql = "SELECT ta.id, ta.task_id, ta.worker_id, ta.submission_text, ta.attachment_path, ta.submitted_at, " +
+                     "u.full_name as worker_name, t.title as task_title " +
+                     "FROM task_assignments ta " +
+                     "JOIN users u ON ta.worker_id = u.id " +
+                     "JOIN tasks t ON ta.task_id = t.id " +
+                     "WHERE ta.status = 'submitted' " +
+                     "ORDER BY ta.submitted_at DESC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
@@ -418,7 +358,10 @@ public class TaskDAO {
     
     public List<Map<String, Object>> getAvailableTasks() {
         List<Map<String, Object>> tasks = new ArrayList<>();
-        String sql = "SELECT t.*, u.full_name as created_by_name FROM tasks t JOIN users u ON t.created_by = u.id WHERE t.status = 'open' ORDER BY t.deadline ASC";
+        String sql = "SELECT t.* FROM tasks t " +
+                     "WHERE t.status = 'open' AND t.assigned_to IS NULL " +
+                     "AND NOT EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id AND ta.status NOT IN ('cancelled', 'rejected')) " +
+                     "ORDER BY t.deadline ASC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
@@ -442,16 +385,98 @@ public class TaskDAO {
     }
     
     public boolean assignTaskToWorker(int taskId, int workerId) {
-        String sql = "UPDATE tasks SET assigned_to = ?, status = 'in-progress' WHERE id = ?";
+        String sql = "{CALL AssignTaskToWorker(?, ?)}";
+        try (Connection conn = DBConnection.getConnection();
+             CallableStatement cstmt = conn.prepareCall(sql)) {
+            cstmt.setInt(1, taskId);
+            cstmt.setInt(2, workerId);
+            ResultSet rs = cstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("success") == 1;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public List<Map<String, Object>> getWorkerTasks(int workerId) {
+        List<Map<String, Object>> tasks = new ArrayList<>();
+        String sql = "SELECT ta.id as assignment_id, ta.status as assignment_status, t.* " +
+                     "FROM task_assignments ta " +
+                     "JOIN tasks t ON ta.task_id = t.id " +
+                     "WHERE ta.worker_id = ? AND ta.status NOT IN ('approved', 'cancelled') " +
+                     "ORDER BY t.deadline ASC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, workerId);
-            pstmt.setInt(2, taskId);
-            return pstmt.executeUpdate() > 0;
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> task = new HashMap<>();
+                task.put("assignment_id", rs.getInt("assignment_id"));
+                task.put("id", rs.getInt("id"));
+                task.put("title", rs.getString("title"));
+                task.put("description", rs.getString("description"));
+                task.put("wage", rs.getDouble("wage"));
+                task.put("deadline", rs.getDate("deadline"));
+                task.put("status", rs.getString("status"));
+                task.put("assignment_status", rs.getString("assignment_status"));
+                tasks.add(task);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+        return tasks;
+    }
+
+    public boolean startTask(int assignmentId) {
+        String sql = "UPDATE task_assignments SET status = 'in_progress' WHERE id = ? AND status = 'accepted'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, assignmentId);
+            int updated = pstmt.executeUpdate();
+            if (updated > 0 || isAlreadyInProgress(assignmentId)) {
+                // Also update the parent task status
+                String updateTaskSql = "UPDATE tasks t JOIN task_assignments ta ON t.id = ta.task_id SET t.status = 'in-progress' WHERE ta.id = ?";
+                try (PreparedStatement pstmt2 = conn.prepareStatement(updateTaskSql)) {
+                    pstmt2.setInt(1, assignmentId);
+                    pstmt2.executeUpdate();
+                }
+                return true;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private boolean isAlreadyInProgress(int assignmentId) {
+        String sql = "SELECT 1 FROM task_assignments WHERE id = ? AND status = 'in_progress'";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, assignmentId);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
             return false;
         }
+    }
+    public boolean submitTaskWork(int assignmentId, String submissionText, String attachmentPath, double hoursWorked) {
+        String sql = "{CALL SubmitTaskWork(?, ?, ?, ?)}";
+        try (Connection conn = DBConnection.getConnection();
+             CallableStatement cstmt = conn.prepareCall(sql)) {
+            cstmt.setInt(1, assignmentId);
+            cstmt.setString(2, submissionText);
+            cstmt.setString(3, attachmentPath);
+            cstmt.setDouble(4, hoursWorked);
+            ResultSet rs = cstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("success") == 1;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
     
     // ==================== ADMIN STATISTICS ====================
@@ -494,6 +519,24 @@ public class TaskDAO {
             e.printStackTrace();
         }
         return trends;
+    }
+
+    public List<Map<String, Object>> getTasksByCategory() {
+        List<Map<String, Object>> categories = new ArrayList<>();
+        String sql = "SELECT category, COUNT(*) as count FROM tasks GROUP BY category";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> cat = new HashMap<>();
+                cat.put("category", rs.getString("category") != null ? rs.getString("category") : "Uncategorized");
+                cat.put("count", rs.getInt("count"));
+                categories.add(cat);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return categories;
     }
     
     // ==================== HELPER METHODS ====================

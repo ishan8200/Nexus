@@ -58,7 +58,11 @@ public class UserDAO {
             if (rs.next()) {
                 // Use BCrypt to verify password
                 if (BCrypt.checkpw(password, rs.getString("password"))) {
-                    return extractUserFromResultSet(rs);
+                    User user = extractUserFromResultSet(rs);
+                    // Populate skillList
+                    com.nex.dao.SkillDAO skillDAO = new com.nex.dao.SkillDAO();
+                    user.setSkillList(skillDAO.getWorkerSkills(user.getId()));
+                    return user;
                 }
             }
         } catch (SQLException e) {
@@ -117,7 +121,11 @@ public class UserDAO {
             pstmt.setInt(1, id);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                return extractUserFromResultSet(rs);
+                User user = extractUserFromResultSet(rs);
+                // Populate skillList using SkillDAO
+                com.nex.dao.SkillDAO skillDAO = new com.nex.dao.SkillDAO();
+                user.setSkillList(skillDAO.getWorkerSkills(id));
+                return user;
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -140,8 +148,8 @@ public class UserDAO {
         return workers;
     }
     
-    public List<Map<String, Object>> getAllWorkersWithStats() {
-        List<Map<String, Object>> workers = new ArrayList<>();
+    public List<User> getAllWorkersWithStats() {
+        List<User> workers = new ArrayList<>();
         String sql = "SELECT u.*, v.assigned_tasks, v.submissions_made, v.avg_rating " +
                      "FROM users u " +
                      "JOIN worker_performance_view v ON u.id = v.worker_id " +
@@ -150,23 +158,14 @@ public class UserDAO {
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
+            com.nex.dao.SkillDAO skillDAO = new com.nex.dao.SkillDAO();
             while (rs.next()) {
-                Map<String, Object> worker = new HashMap<>();
-                worker.put("id", rs.getInt("id"));
-                worker.put("username", rs.getString("username"));
-                worker.put("email", rs.getString("email"));
-                worker.put("full_name", rs.getString("full_name"));
-                worker.put("phone", rs.getString("phone"));
-                worker.put("role", rs.getString("role"));
-                worker.put("status", rs.getString("status"));
-                worker.put("skills", rs.getString("skills"));
-                worker.put("rating", rs.getDouble("rating"));
-                worker.put("avg_rating", rs.getDouble("avg_rating"));
-                worker.put("total_earned", rs.getDouble("total_earned"));
-                worker.put("tasks_completed", rs.getInt("tasks_completed"));
-                worker.put("assigned_tasks", rs.getInt("assigned_tasks"));
-                worker.put("submissions_made", rs.getInt("submissions_made"));
-                worker.put("created_at", rs.getTimestamp("created_at"));
+                User worker = extractUserFromResultSet(rs);
+                worker.setAssignedTasks(rs.getInt("assigned_tasks"));
+                worker.setSubmissionsMade(rs.getInt("submissions_made"));
+                worker.setAvgRating(rs.getDouble("avg_rating"));
+                // Populate skillList
+                worker.setSkillList(skillDAO.getWorkerSkills(worker.getId()));
                 workers.add(worker);
             }
         } catch (SQLException e) {
@@ -199,21 +198,14 @@ public class UserDAO {
         return 0;
     }
     
-    public List<Map<String, Object>> getPendingWorkersList() {
-        List<Map<String, Object>> workers = new ArrayList<>();
-        String sql = "SELECT id, full_name, email, phone, skills, created_at FROM users WHERE role = 'worker' AND status = 'pending' ORDER BY created_at DESC";
+    public List<User> getPendingWorkersList() {
+        List<User> workers = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE role = 'worker' AND status = 'pending' ORDER BY created_at DESC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
             while (rs.next()) {
-                Map<String, Object> worker = new HashMap<>();
-                worker.put("id", rs.getInt("id"));
-                worker.put("full_name", rs.getString("full_name"));
-                worker.put("email", rs.getString("email"));
-                worker.put("phone", rs.getString("phone"));
-                worker.put("skills", rs.getString("skills"));
-                worker.put("created_at", rs.getTimestamp("created_at"));
-                workers.add(worker);
+                workers.add(extractUserFromResultSet(rs));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -235,14 +227,60 @@ public class UserDAO {
     }
     
     public boolean deleteUser(int userId) {
-        String sql = "DELETE FROM users WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, userId);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Delete from wages where worker_id = ?
+            String deleteWagesSql = "DELETE FROM wages WHERE worker_id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteWagesSql)) {
+                pstmt.setInt(1, userId);
+                pstmt.executeUpdate();
+            }
+
+            // 2. Delete from task_submissions where worker_id = ?
+            String deleteSubmissionsSql = "DELETE FROM task_submissions WHERE worker_id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteSubmissionsSql)) {
+                pstmt.setInt(1, userId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Delete from payment_history where worker_id = ?
+            String deletePaymentHistorySql = "DELETE FROM payment_history WHERE worker_id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(deletePaymentHistorySql)) {
+                pstmt.setInt(1, userId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Finally delete the user
+            String deleteUserSql = "DELETE FROM users WHERE id = ?";
+            int rowsDeleted = 0;
+            try (PreparedStatement pstmt = conn.prepareStatement(deleteUserSql)) {
+                pstmt.setInt(1, userId);
+                rowsDeleted = pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return rowsDeleted > 0;
         } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
     
@@ -279,16 +317,32 @@ public class UserDAO {
     
     public Map<String, Object> getWorkerStats(int workerId) {
         Map<String, Object> stats = new HashMap<>();
-        String sql = "{CALL GetWorkerStats(?)}";
+        String sql = "SELECT " +
+                     "(SELECT COALESCE(SUM(amount), 0) FROM wages WHERE worker_id = ?) AS total_earned, " +
+                     "(SELECT COUNT(*) FROM tasks WHERE assigned_to = ? AND status = 'completed') AS tasks_completed, " +
+                     "(SELECT COUNT(*) FROM tasks WHERE assigned_to = ?) AS assigned_tasks, " +
+                     "(SELECT COALESCE(AVG(rating), 0) FROM task_submissions WHERE worker_id = ? AND status = 'approved') AS avg_rating, " +
+                     "(SELECT COALESCE(SUM(amount), 0) FROM wages WHERE worker_id = ? AND status = 'pending') AS pending_payment, " +
+                     "(SELECT COUNT(*) FROM task_submissions ts JOIN tasks t ON ts.task_id = t.id " +
+                     "WHERE ts.worker_id = ? AND ts.submitted_at > t.deadline) AS late_submissions";
         try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql)) {
-            cstmt.setInt(1, workerId);
-            ResultSet rs = cstmt.executeQuery();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            for (int i = 1; i <= 6; i++) {
+                pstmt.setInt(i, workerId);
+            }
+            ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
                 stats.put("total_earned", rs.getDouble("total_earned"));
                 stats.put("tasks_completed", rs.getInt("tasks_completed"));
+                stats.put("assigned_tasks", rs.getInt("assigned_tasks"));
                 stats.put("avg_rating", rs.getDouble("avg_rating"));
                 stats.put("pending_payment", rs.getDouble("pending_payment"));
+                stats.put("late_submissions", rs.getInt("late_submissions"));
+                
+                int assigned = rs.getInt("assigned_tasks");
+                int completed = rs.getInt("tasks_completed");
+                double rate = (assigned > 0) ? (double) completed / assigned * 100 : 0;
+                stats.put("completion_rate", rate);
             }
         } catch (SQLException e) {
             e.printStackTrace();

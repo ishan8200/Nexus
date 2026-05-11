@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.util.*, com.nex.model.User" %>
+<%@ page import="java.util.*, com.nex.model.User, com.nex.model.Skill" %>
 <%
     // Check if user is logged in and is a worker
     User currentUser = (User) request.getAttribute("currentUser");
@@ -11,8 +11,8 @@
     List<Map<String, Object>> availableTasks = (List<Map<String, Object>>) request.getAttribute("availableTasks");
     List<Map<String, Object>> myTasks = (List<Map<String, Object>>) request.getAttribute("myTasks");
     List<Map<String, Object>> earningsHistory = (List<Map<String, Object>>) request.getAttribute("earningsHistory");
-    List<Map<String, Object>> allSkills = (List<Map<String, Object>>) request.getAttribute("allSkills");
-    List<Map<String, Object>> workerSkills = (List<Map<String, Object>>) request.getAttribute("workerSkills");
+    List<Skill> allSkills = (List<Skill>) request.getAttribute("allSkills");
+    List<Skill> workerSkills = (List<Skill>) request.getAttribute("workerSkills");
     List<Map<String, Object>> performance = (List<Map<String, Object>>) request.getAttribute("performance");
     
     // Stats
@@ -20,6 +20,8 @@
     Integer tasksCompleted = (Integer) request.getAttribute("tasksCompleted");
     Double avgRating = (Double) request.getAttribute("avgRating");
     Double pendingPayment = (Double) request.getAttribute("pendingPayment");
+    Double completionRate = (Double) request.getAttribute("completionRate");
+    Integer lateSubmissions = (Integer) request.getAttribute("lateSubmissions");
     
     // Formatter for currency
     java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(Locale.US);
@@ -271,6 +273,30 @@
                     </div>
                 </div>
 
+                <!-- Quick Actions -->
+                <div class="quick-actions" style="margin: var(--space-lg) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md);">
+                    <div class="quick-action-card" onclick="switchToPage('available-tasks')">
+                        <div class="quick-action-icon">🔍</div>
+                        <div class="quick-action-title">Find New Tasks</div>
+                        <div class="quick-action-desc">Browse available work</div>
+                    </div>
+                    <div class="quick-action-card" onclick="switchToPage('my-tasks')">
+                        <div class="quick-action-icon">📋</div>
+                        <div class="quick-action-title">My Active Tasks</div>
+                        <div class="quick-action-desc">Continue working</div>
+                    </div>
+                    <div class="quick-action-card" onclick="switchToPage('earnings')">
+                        <div class="quick-action-icon">💰</div>
+                        <div class="quick-action-title">View Earnings</div>
+                        <div class="quick-action-desc">Track your income</div>
+                    </div>
+                    <div class="quick-action-card" onclick="switchToPage('my-performance')">
+                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-title">Performance</div>
+                        <div class="quick-action-desc">See your stats</div>
+                    </div>
+                </div>
+
                 <div class="dashboard-grid">
                     <div class="admin-card">
                         <div class="admin-card-header">
@@ -299,6 +325,33 @@
                                     <button class="btn btn-outline" style="margin-top: 15px;" onclick="switchToPage('available-tasks')">Browse Tasks</button>
                                 </div>
                             <% } %>
+                        </div>
+                    </div>
+
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3>📊 Performance Summary</h3>
+                            <button class="btn-icon" onclick="switchToPage('my-performance')">Details →</button>
+                        </div>
+                        <div class="admin-card-body">
+                            <div class="performance-grid">
+                                <div class="performance-card" style="background: var(--nexus-elevated);">
+                                    <div class="performance-value" style="font-size: 1.2rem;"><%= completionRate != null ? String.format("%.0f%%", completionRate) : "0%" %></div>
+                                    <div class="performance-label">Completion</div>
+                                </div>
+                                <div class="performance-card" style="background: var(--nexus-elevated);">
+                                    <div class="performance-value" style="font-size: 1.2rem;"><%= avgRating != null ? String.format("%.1f", avgRating) : "0.0" %></div>
+                                    <div class="performance-label">Avg Rating</div>
+                                </div>
+                                <div class="performance-card" style="background: var(--nexus-elevated);">
+                                    <div class="performance-value" style="font-size: 1.2rem;"><%= tasksCompleted != null ? tasksCompleted : 0 %></div>
+                                    <div class="performance-label">Total Done</div>
+                                </div>
+                                <div class="performance-card" style="background: var(--nexus-elevated);">
+                                    <div class="performance-value" style="font-size: 1.2rem;"><%= lateSubmissions != null ? lateSubmissions : 0 %></div>
+                                    <div class="performance-label">Late Subs</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -333,7 +386,7 @@
             </div>
 
             <!-- Available Tasks View -->
-            <div id="availableTasksView" class="page-section">
+            <div id="available-tasksView" class="page-section">
                 <div class="grid-2">
                     <% if (availableTasks != null && !availableTasks.isEmpty()) { %>
                         <% for (Map<String, Object> task : availableTasks) { %>
@@ -358,10 +411,7 @@
                                     <div style="font-size: 12px; color: var(--text-muted);">
                                         📅 Deadline: <%= task.get("deadline") %>
                                     </div>
-                                    <form action="${pageContext.request.contextPath}/accept-task" method="POST" style="margin: 0;">
-                                        <input type="hidden" name="taskId" value="<%= task.get("id") %>">
-                                        <button type="submit" class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
-                                    </form>
+                                    <button onclick="acceptTask(<%= task.get("id") %>, this)" class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
                                 </div>
                             </div>
                         <% } %>
@@ -375,7 +425,7 @@
             </div>
 
             <!-- My Tasks View -->
-            <div id="myTasksView" class="page-section">
+            <div id="my-tasksView" class="page-section">
                 <div class="admin-card">
                     <div class="admin-card-header">
                         <h3>📋 Assigned Deliverables</h3>
@@ -393,19 +443,33 @@
                             </thead>
                             <tbody>
                                 <% if (myTasks != null && !myTasks.isEmpty()) { %>
-                                    <% for (Map<String, Object> task : myTasks) { %>
+                                    <% for (Map<String, Object> task : myTasks) { 
+                                        String aStatus = (String) task.get("assignment_status");
+                                        int aId = (int) task.get("assignment_id");
+                                    %>
                                         <tr>
                                             <td style="font-weight: 600;"><%= task.get("title") %></td>
                                             <td><%= task.get("deadline") %></td>
                                             <td style="font-family: 'JetBrains Mono'; font-weight: 700;"><%= cur.format(task.get("wage")) %></td>
                                             <td>
-                                                <% String status = (String) task.get("status"); %>
-                                                <span class="status-badge <%= status.toLowerCase().replace(" ", "-") %>">
-                                                    <%= status %>
+                                                <span class="status-badge <%= aStatus.toLowerCase().replace("_", "-") %>">
+                                                    <%= aStatus.toUpperCase() %>
                                                 </span>
                                             </td>
                                             <td>
-                                                <button class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">Submit Work</button>
+                                                <% if ("accepted".equals(aStatus)) { %>
+                                                    <button onclick="startTask('<%= aId %>', this)" class="btn btn-primary" style="padding: 5px 12px; font-size: 11px;">Start Task</button>
+                                                <% } else if ("in_progress".equals(aStatus)) { %>
+                                                    <button onclick="openSubmitModal(this.getAttribute('data-id'), this.getAttribute('data-title'))" 
+                                                            data-id="<%= aId %>"
+                                                            data-title="<%= task.get("title").toString().replace("\"", "&quot;") %>"
+                                                            class="btn btn-secondary" 
+                                                            style="padding: 5px 12px; font-size: 11px; background: var(--nexus-success); color: white; border: none;">
+                                                        Submit Work
+                                                    </button>
+                                                <% } else if ("submitted".equals(aStatus)) { %>
+                                                    <span style="font-size: 11px; color: var(--text-muted);">Awaiting Review</span>
+                                                <% } %>
                                             </td>
                                         </tr>
                                     <% } %>
@@ -422,6 +486,25 @@
 
             <!-- My Performance View -->
             <div id="my-performanceView" class="page-section">
+                <div class="performance-grid" style="margin-bottom: var(--space-lg);">
+                    <div class="performance-card">
+                        <div class="performance-value"><%= tasksCompleted != null ? tasksCompleted : 0 %></div>
+                        <div class="performance-label">Tasks Completed</div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-value"><%= avgRating != null ? String.format("%.1f", avgRating) : "0.0" %></div>
+                        <div class="performance-label">Avg Rating ★</div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-value"><%= completionRate != null ? String.format("%.0f%%", completionRate) : "0%" %></div>
+                        <div class="performance-label">Completion Rate</div>
+                    </div>
+                    <div class="performance-card">
+                        <div class="performance-value"><%= lateSubmissions != null ? lateSubmissions : 0 %></div>
+                        <div class="performance-label">Late Submissions</div>
+                    </div>
+                </div>
+
                 <div class="admin-card">
                     <div class="admin-card-header">
                         <h3>📈 Task Performance & Ratings</h3>
@@ -473,73 +556,75 @@
             </div>
 
             <!-- My Skills View -->
-            <div id="mySkillsView" class="page-section">
-                <div class="grid-2">
-                    <div class="admin-card">
-                        <div class="admin-card-header">
-                            <h3>🛠️ Manage My Skills</h3>
-                        </div>
-                        <div class="admin-card-body">
-                            <form action="${pageContext.request.contextPath}/manage-skills" method="POST">
-                                <input type="hidden" name="action" value="add">
-                                <div class="form-group">
-                                    <label class="form-label">Select Skill</label>
-                                    <select name="skillId" class="input-field">
-                                        <option value="">-- Choose a skill --</option>
-                                        <% if (allSkills != null) { 
-                                            for (Map<String, Object> skill : allSkills) { %>
-                                                <option value="<%= skill.get("id") %>"><%= skill.get("skill_name") %></option>
-                                            <% } 
-                                        } %>
-                                    </select>
-                                </div>
-                                <div style="text-align: center; margin: 15px 0; color: var(--text-muted); font-size: 12px; font-weight: 600;">OR ADD NEW</div>
-                                <div class="form-group">
-                                    <label class="form-label">Other Skill</label>
-                                    <input type="text" name="otherSkill" class="input-field" placeholder="Enter custom skill name...">
-                                </div>
-                                <div class="form-group" style="margin-top: 15px;">
-                                    <label class="form-label">Proficiency Level</label>
-                                    <select name="proficiency" class="input-field">
-                                        <option value="1">Beginner</option>
-                                        <option value="2">Intermediate</option>
-                                        <option value="3">Advanced</option>
-                                        <option value="4">Expert</option>
-                                        <option value="5">Master</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 15px;">Add Skill to Portfolio</button>
-                            </form>
-                        </div>
+            <div id="my-skillsView" class="page-section">
+                <div class="admin-card" style="max-width: 900px; margin: 0 auto;">
+                    <div class="admin-card-header">
+                        <h3>🛠️ Professional Skill Portfolio</h3>
                     </div>
+                    <div class="admin-card-body">
+                        <div class="grid-2" style="gap: 40px;">
+                            <div>
+                                <h4 style="margin-bottom: 20px; font-weight: 700; color: var(--text-primary);">Add New Expertise</h4>
+                                <form action="${pageContext.request.contextPath}/manage-skills" method="POST">
+                                    <input type="hidden" name="action" value="add">
+                                    <div class="form-group">
+                                        <label class="form-label">Select Recognized Skill</label>
+                                        <select name="skillId" class="input-field">
+                                            <option value="">-- Choose from library --</option>
+                                            <% if (allSkills != null) { 
+                                                for (Skill skill : allSkills) { %>
+                                                    <option value="<%= skill.getId() %>"><%= skill.getSkillName() %></option>
+                                                <% } 
+                                            } %>
+                                        </select>
+                                    </div>
+                                    <div style="text-align: center; margin: 15px 0; color: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">OR DEFINE CUSTOM</div>
+                                    <div class="form-group">
+                                        <label class="form-label">Custom Skill Name</label>
+                                        <input type="text" name="otherSkill" class="input-field" placeholder="e.g. Advanced Prompt Engineering">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 15px;">
+                                        <label class="form-label">Proficiency Level</label>
+                                        <select name="proficiency" class="input-field">
+                                            <option value="1">Beginner (1/5)</option>
+                                            <option value="2">Intermediate (2/5)</option>
+                                            <option value="3">Advanced (3/5)</option>
+                                            <option value="4">Expert (4/5)</option>
+                                            <option value="5">Master (5/5)</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Update Portfolio</button>
+                                </form>
+                            </div>
 
-                    <div class="admin-card">
-                        <div class="admin-card-header">
-                            <h3>📜 Current Skillset</h3>
-                        </div>
-                        <div class="admin-card-body">
-                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                                <% if (workerSkills != null && !workerSkills.isEmpty()) { 
-                                    String[] levels = {"", "Beginner", "Intermediate", "Advanced", "Expert", "Master"};
-                                    for (Map<String, Object> skill : workerSkills) { 
-                                        int pLevel = (int) skill.get("proficiency_level");
-                                        String levelLabel = pLevel >= 1 && pLevel <= 5 ? levels[pLevel] : "Novice";
-                                %>
-                                        <div style="background: var(--nexus-accent-light); border: 1px solid var(--nexus-accent); border-radius: 20px; padding: 5px 15px; display: flex; align-items: center; gap: 8px;">
-                                            <div style="display: flex; flex-direction: column;">
-                                                <span style="font-size: 13px; font-weight: 600; color: var(--nexus-accent);"><%= skill.get("skill_name") %></span>
-                                                <span style="font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;"><%= levelLabel %></span>
+                            <div style="border-left: 1px solid var(--nexus-border); padding-left: 40px;">
+                                <h4 style="margin-bottom: 20px; font-weight: 700; color: var(--text-primary);">Your Verified Skillset</h4>
+                                <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                                    <% if (workerSkills != null && !workerSkills.isEmpty()) { 
+                                        String[] levels = {"", "Beginner", "Intermediate", "Advanced", "Expert", "Master"};
+                                        for (Skill skill : workerSkills) { 
+                                            int pLevel = skill.getProficiencyLevel();
+                                            String levelLabel = pLevel >= 1 && pLevel <= 5 ? levels[pLevel] : "Novice";
+                                    %>
+                                            <div style="background: var(--nexus-elevated); border: 1px solid var(--nexus-border); border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; gap: 12px; transition: all 0.2s;">
+                                                <div style="display: flex; flex-direction: column;">
+                                                    <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);"><%= skill.getSkillName() %></span>
+                                                    <span style="font-size: 10px; color: var(--nexus-accent); font-weight: 800; text-transform: uppercase;"><%= levelLabel %></span>
+                                                </div>
+                                                <form action="${pageContext.request.contextPath}/manage-skills" method="POST" style="margin: 0; display: flex;">
+                                                    <input type="hidden" name="action" value="remove">
+                                                    <input type="hidden" name="skillId" value="<%= skill.getId() %>">
+                                                    <button type="submit" style="background: var(--nexus-danger-light); border: none; color: var(--nexus-danger); cursor: pointer; font-size: 14px; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">×</button>
+                                                </form>
                                             </div>
-                                            <form action="${pageContext.request.contextPath}/manage-skills" method="POST" style="margin: 0; display: flex;">
-                                                <input type="hidden" name="action" value="remove">
-                                                <input type="hidden" name="skillId" value="<%= skill.get("id") %>">
-                                                <button type="submit" style="background: none; border: none; color: var(--nexus-danger); cursor: pointer; font-size: 16px; padding: 0; display: flex; align-items: center;">×</button>
-                                            </form>
+                                        <% } 
+                                    } else { %>
+                                        <div style="text-align: center; width: 100%; padding: 40px 0;">
+                                            <div style="font-size: 40px; margin-bottom: 10px;">🛠️</div>
+                                            <p style="color: var(--text-muted); font-size: 14px;">No skills listed in your profile yet.</p>
                                         </div>
-                                    <% } 
-                                } else { %>
-                                    <p style="color: var(--text-muted); padding: 20px; text-align: center; width: 100%;">You haven't added any skills yet.</p>
-                                <% } %>
+                                    <% } %>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -619,7 +704,18 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Core Skills</label>
-                            <textarea class="textarea-field" readonly><%= currentUser.getSkills() != null ? currentUser.getSkills() : "No skills listed." %></textarea>
+                            <textarea class="textarea-field" readonly><% 
+                                if (workerSkills != null && !workerSkills.isEmpty()) {
+                                    StringBuilder sb = new StringBuilder();
+                                    for (int i = 0; i < workerSkills.size(); i++) {
+                                        sb.append(workerSkills.get(i).getSkillName());
+                                        if (i < workerSkills.size() - 1) sb.append(", ");
+                                    }
+                                    out.print(sb.toString());
+                                } else {
+                                    out.print("No skills listed.");
+                                }
+                            %></textarea>
                         </div>
                         <div style="margin-top: 20px; padding: 15px; background: var(--nexus-accent-light); border-radius: var(--radius-md); border: 1px solid var(--nexus-accent);">
                             <p style="font-size: 13px; color: var(--text-secondary);">
@@ -663,6 +759,28 @@
         </main>
     </div>
 
+    <!-- Submission Modal -->
+    <div id="submitModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div class="modal-content" style="background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
+            <h2 id="modalTaskTitle" style="margin-bottom: 20px;">Submit Work</h2>
+            <form action="${pageContext.request.contextPath}/submit-task" method="POST">
+                <input type="hidden" id="modalAssignmentId" name="assignmentId">
+                <div class="form-group">
+                    <label class="form-label">Submission Details / Proof of Work</label>
+                    <textarea name="submissionText" class="textarea-field" required placeholder="Describe what you've completed..." style="height: 120px;"></textarea>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label class="form-label">Hours Worked</label>
+                    <input type="number" name="hoursWorked" step="0.5" min="0" class="input-field" placeholder="e.g. 2.5">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button type="button" onclick="closeSubmitModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Submit Deliverable</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         function switchToPage(pageId) {
             // Hide all sections
@@ -675,6 +793,8 @@
             if (targetSection) {
                 targetSection.classList.add('active');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+                // Persist the current page
+                localStorage.setItem('worker_active_tab', pageId);
             }
             
             // Update sidebar active state
@@ -682,7 +802,7 @@
                 item.classList.remove('active');
             });
             
-            const activeItem = document.querySelector(`.nav-item[onclick*="${pageId}"]`);
+            const activeItem = document.querySelector(`.nav-item[onclick*="\${pageId}"]`);
             if (activeItem) {
                 activeItem.classList.add('active');
             }
@@ -714,12 +834,196 @@
             document.getElementById('pageSubtitle').textContent = subtitles[pageId] || 'Operational Node';
         }
         
+       function openSubmitModal(assignmentId, taskTitle) {
+            try {
+                console.log('openSubmitModal called with:', { assignmentId, taskTitle });
+                
+                const assignmentIdInput = document.getElementById('modalAssignmentId');
+                const taskTitleElem = document.getElementById('modalTaskTitle');
+                const modal = document.getElementById('submitModal');
+                
+                if (!assignmentIdInput || !taskTitleElem || !modal) {
+                    console.error('Missing modal elements:', { assignmentIdInput, taskTitleElem, modal });
+                    alert('Technical error: Modal elements not found.');
+                    return;
+                }
+                
+                assignmentIdInput.value = assignmentId;
+                taskTitleElem.textContent = 'Submit Work: ' + taskTitle;
+                
+                modal.style.display = 'flex';
+                // Small delay to allow display: flex to take effect before adding the active class for transition
+                setTimeout(() => {
+                    modal.classList.add('active');
+                }, 10);
+                console.log('Modal display set to flex and active class added');
+            } catch (err) {
+                console.error('Exception in openSubmitModal:', err);
+                alert('An error occurred while opening the submission window.');
+            }
+        }
+        
+        function closeSubmitModal() {
+            const modal = document.getElementById('submitModal');
+            if (modal) {
+                modal.classList.remove('active');
+                // Wait for the transition to finish before hiding the element (matching --transition-smooth: 300ms)
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        function acceptTask(taskId, btn) {
+            fetch('${pageContext.request.contextPath}/accept-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'taskId=' + taskId
+            }).then(response => {
+                if (response.redirected) {
+                    const url = new URL(response.url);
+                    const msg = url.searchParams.get('success');
+                    const err = url.searchParams.get('error');
+                    if (msg) {
+                        showAlert('alertContainer', msg, 'success');
+                        // Remove the task card from available tasks
+                        const taskCard = btn.closest('.task-card-improved');
+                        if (taskCard) taskCard.remove();
+                        // Also might want to refresh the my-tasks section
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else if (err) {
+                        showAlert('alertContainer', err, 'error');
+                    }
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                showAlert('alertContainer', 'Network error occurred', 'error');
+            });
+        }
+
+        function startTask(assignmentId, btn) {
+            fetch('${pageContext.request.contextPath}/update-assignment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'assignmentId=' + assignmentId + '&action=start'
+            }).then(response => {
+                if (response.redirected) {
+                    const url = new URL(response.url);
+                    const msg = url.searchParams.get('success');
+                    const err = url.searchParams.get('error');
+                    if (msg) {
+                        showAlert('alertContainer', msg, 'success');
+                        // Update the UI
+                        const row = btn.closest('tr');
+                        const statusBadge = row.querySelector('.status-badge');
+                        statusBadge.className = 'status-badge in-progress';
+                        statusBadge.textContent = 'IN_PROGRESS';
+                        // Change button to submit button with proper escaping and DOM-based title retrieval
+                        btn.outerHTML = `<button onclick="openSubmitModal('\${assignmentId}', this.closest('tr').cells[0].textContent.trim())" class="btn btn-secondary" style="padding: 5px 12px; font-size: 11px; background: var(--nexus-success); color: white; border: none;">Submit Work</button>`;
+                    } else if (err) {
+                        showAlert('alertContainer', err, 'error');
+                    }
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                showAlert('alertContainer', 'Network error occurred', 'error');
+            });
+        }
+
+        function submitWork(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new URLSearchParams(new FormData(form));
+            
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(response => {
+                if (response.redirected) {
+                    const url = new URL(response.url);
+                    const msg = url.searchParams.get('success');
+                    if (msg) {
+                        showAlert('alertContainer', msg, 'success');
+                        closeSubmitModal();
+                        const aId = document.getElementById('modalAssignmentId').value;
+                        const row = document.querySelector(`button[onclick*="'\${aId}'"]`)?.closest('tr');
+                        if (row) {
+                            const statusBadge = row.querySelector('.status-badge');
+                            statusBadge.className = 'status-badge submitted';
+                            statusBadge.textContent = 'SUBMITTED';
+                            row.cells[4].innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Awaiting Review</span>';
+                        }
+                    }
+                }
+            });
+        }
+
+        function manageSkill(event, action) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new URLSearchParams(new FormData(form));
+            
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(response => {
+                // For skills, since the structure is complex, a partial reload or dynamic update is needed
+                // For now, let's reload just the skill section or use simple location.reload for this specific complex one
+                // to ensure all UI elements (dropdowns, lists) are in sync.
+                location.reload(); 
+            });
+        }
+
+        // Make sure form submission is handled
+        document.querySelector('#submitModal form')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new URLSearchParams(new FormData(this));
+            
+            fetch(this.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(response => {
+                if (response.redirected) {
+                    const url = new URL(response.url);
+                    const msg = url.searchParams.get('success');
+                    const err = url.searchParams.get('error');
+                    if (msg) {
+                        showAlert('alertContainer', msg, 'success');
+                        closeSubmitModal();
+                        // Refresh the page to show updated task status
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else if (err) {
+                        showAlert('alertContainer', err, 'error');
+                    }
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                showAlert('alertContainer', 'Network error occurred', 'error');
+            });
+        });
+
         // Initial setup
         window.onload = function() {
+            // Restore last active tab
+            const savedTab = localStorage.getItem('worker_active_tab');
+            if (savedTab) {
+                switchToPage(savedTab);
+            }
+
             // Check for success/error messages in URL if needed
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('success')) {
                 showAlert('alertContainer', urlParams.get('success'), 'success');
+            }
+            if (urlParams.has('error')) {
+                showAlert('alertContainer', urlParams.get('error'), 'error');
             }
         };
     </script>

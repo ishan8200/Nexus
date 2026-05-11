@@ -16,9 +16,9 @@
     int pendingSubmissions = (int) request.getAttribute("pendingSubmissions");
     
     List<Map<String, Object>> recentTasks = (List<Map<String, Object>>) request.getAttribute("recentTasks");
-    List<Map<String, Object>> pendingWorkersList = (List<Map<String, Object>>) request.getAttribute("pendingWorkersList");
+    List<User> pendingWorkersList = (List<User>) request.getAttribute("pendingWorkersList");
     List<Map<String, Object>> pendingSubmissionsList = (List<Map<String, Object>>) request.getAttribute("pendingSubmissionsList");
-    List<Map<String, Object>> allWorkers = (List<Map<String, Object>>) request.getAttribute("allWorkers");
+    List<User> allWorkers = (List<User>) request.getAttribute("allWorkers");
     List<Map<String, Object>> allTasks = (List<Map<String, Object>>) request.getAttribute("allTasks");
     List<Map<String, Object>> wageSummary = (List<Map<String, Object>>) request.getAttribute("wageSummary");
     
@@ -35,6 +35,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="${pageContext.request.contextPath}/js/alert.js"></script>
     <style>
         /* Custom overrides for dashboard specific elements */
@@ -95,6 +96,23 @@
         .submission-worker { font-weight: 700; font-size: 16px; }
         .submission-date { font-size: 12px; color: var(--text-muted); }
         .submission-body { font-size: 14px; margin-bottom: 15px; color: var(--text-secondary); }
+
+        /* Reports styling */
+        .reports-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .report-item {
+            padding: 25px;
+            background: white;
+            border: 1px solid var(--nexus-border);
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+        .report-item:hover { border-color: var(--nexus-accent); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .report-icon { font-size: 32px; background: var(--nexus-surface); width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+        .report-info h4 { margin-bottom: 5px; font-weight: 700; }
+        .report-info p { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
         /* Interactive Rating Stars */
         .rating-stars {
@@ -182,6 +200,16 @@
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('wages')">
                     <span class="nav-icon">💰</span>
                     <span class="nav-text">Wages</span>
+                </a>
+                
+                <div class="nav-section-title">REPORTS</div>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('analytics')">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('reports')">
+                    <span class="nav-icon">📎</span>
+                    <span class="nav-text">Export Reports</span>
                 </a>
                 
                 <div class="nav-section-title">ACCOUNT</div>
@@ -296,13 +324,13 @@
                                         </td>
                                     </tr>
                                     <% } %>
-                                    <% for (Map<String, Object> worker : pendingWorkersList) { %>
+                                    <% for (User worker : pendingWorkersList) { %>
                                     <tr>
                                         <td><span class="status-badge pending">Registration</span></td>
-                                        <td><strong><%= worker.get("full_name") %></strong></td>
-                                        <td style="font-size: 11px;"><%= worker.get("created_at") %></td>
+                                        <td><strong><%= worker.getFullName() %></strong></td>
+                                        <td style="font-size: 11px;"><%= worker.getCreatedAt() %></td>
                                         <td>
-                                            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveWorker(<%= worker.get("id") %>, this)">Approve</button>
+                                            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveWorker(<%= worker.getId() %>, this)">Approve</button>
                                         </td>
                                     </tr>
                                     <% } %>
@@ -355,7 +383,7 @@
                         <h3>Deploy New Mission</h3>
                     </div>
                     <div class="admin-card-body">
-                        <form id="createTaskForm" action="${pageContext.request.contextPath}/CreateTaskServlet" method="POST">
+                        <form id="createTaskForm" onsubmit="deployMission(event)">
                             <div class="form-group">
                                 <label class="form-label">Mission Title *</label>
                                 <input type="text" class="input-field" name="title" placeholder="e.g. Neural Engine UI Audit" required>
@@ -413,35 +441,46 @@
                                 <tr><th>Full Name</th><th>Tasks</th><th>Rating</th><th>Total Earned</th><th>Status</th><th>Action</th></tr>
                             </thead>
                             <tbody>
-                                <% for (Map<String, Object> worker : allWorkers) { %>
+                                <% for (User worker : allWorkers) { %>
                                 <tr>
-                                    <td><strong><%= worker.get("full_name") %></strong><br><small style="color: var(--text-muted);"><%= worker.get("email") %></small></td>
-                                    <td><%= worker.get("tasks_completed") %></td>
+                                    <td><strong><%= worker.getFullName() %></strong><br><small style="color: var(--text-muted);"><%= worker.getEmail() %></small></td>
+                                    <td><%= worker.getTasksCompleted() %></td>
                                     <td>
-                                        <div class="rating-stars" data-worker-id="<%= worker.get("id") %>">
+                                        <div class="rating-stars" data-worker-id="<%= worker.getId() %>">
                                             <% 
-                                                double currentRating = (double) worker.get("rating");
+                                                double currentRating = worker.getRating();
                                                 for(int i = 1; i <= 5; i++) { 
                                             %>
-                                                <span class="star <%= i <= currentRating ? "active" : "" %>" onclick="rateWorker(<%= worker.get("id") %>, <%= i %>, this)">★</span>
+                                                <span class="star <%= i <= currentRating ? "active" : "" %>" onclick="rateWorker(<%= worker.getId() %>, <%= i %>, this)">★</span>
                                             <% } %>
                                         </div>
                                     </td>
-                                    <td style="font-family: 'JetBrains Mono';"><%= cur.format(worker.get("total_earned")) %></td>
-                                    <td><span class="status-badge <%= ((String)worker.get("status")).toLowerCase() %>"><%= worker.get("status") %></span></td>
+                                    <td style="font-family: 'JetBrains Mono';"><%= cur.format(worker.getTotalEarned()) %></td>
+                                    <td><span class="status-badge <%= worker.getStatus().toLowerCase() %>"><%= worker.getStatus() %></span></td>
                                     <td>
-                                        <% if ("pending".equals(worker.get("status"))) { %>
-                                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="approveWorker(<%= worker.get("id") %>, this)">Approve</button>
+                                        <% if ("pending".equals(worker.getStatus())) { %>
+                                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" onclick="approveWorker(<%= worker.getId() %>, this)">Approve</button>
                                         <% } else { %>
                                             <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" 
-                                                onclick="manageWorker(<%= worker.get("id") %>, '<%= worker.get("status") %>', this)"
-                                                data-name="<%= worker.get("full_name") %>"
-                                                data-email="<%= worker.get("email") %>"
-                                                data-phone="<%= worker.get("phone") != null ? worker.get("phone") : "N/A" %>"
-                                                data-skills="<%= worker.get("skills") != null ? worker.get("skills") : "No skills listed" %>"
-                                                data-rating="<%= String.format("%.1f", worker.get("rating")) %>"
-                                                data-earned="<%= cur.format(worker.get("total_earned")) %>"
-                                                data-tasks="<%= worker.get("tasks_completed") %>">Manage</button>
+                                                onclick="manageWorker(<%= worker.getId() %>, '<%= worker.getStatus() %>', this)"
+                                                data-name="<%= worker.getFullName() %>"
+                                                data-email="<%= worker.getEmail() %>"
+                                                data-phone="<%= worker.getPhone() != null ? worker.getPhone() : "N/A" %>"
+                                                data-skills="<% 
+                                                    if (worker.getSkillList() != null && !worker.getSkillList().isEmpty()) {
+                                                        StringBuilder sb = new StringBuilder();
+                                                        for (int i = 0; i < worker.getSkillList().size(); i++) {
+                                                            sb.append(worker.getSkillList().get(i).getSkillName());
+                                                            if (i < worker.getSkillList().size() - 1) sb.append(", ");
+                                                        }
+                                                        out.print(sb.toString());
+                                                    } else {
+                                                        out.print("No skills listed");
+                                                    }
+                                                %>"
+                                                data-rating="<%= String.format("%.1f", worker.getRating()) %>"
+                                                data-earned="<%= cur.format(worker.getTotalEarned()) %>"
+                                                data-tasks="<%= worker.getTasksCompleted() %>">Manage</button>
                                         <% } %>
                                     </td>
                                 </tr>
@@ -510,6 +549,99 @@
                                 <% } %>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics View -->
+            <div id="analyticsView" class="page-section">
+                <div class="dashboard-grid">
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3>📈 Task Velocity & Trends</h3>
+                        </div>
+                        <div class="admin-card-body" style="padding: 20px;">
+                            <canvas id="trendsChart" style="width: 100%; height: 300px;"></canvas>
+                        </div>
+                    </div>
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3>📊 Mission Distribution</h3>
+                        </div>
+                        <div class="admin-card-body" style="padding: 20px;">
+                            <canvas id="categoryChart" style="width: 100%; height: 300px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="admin-card" style="margin-top: 20px;">
+                    <div class="admin-card-header">
+                        <h3>⚡ Performance Nodes</h3>
+                    </div>
+                    <div class="admin-card-body" style="padding: 20px;">
+                        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="stat-card" style="padding: 15px;">
+                                <div class="stat-label">System Uptime</div>
+                                <div class="stat-value" style="font-size: 20px;">99.9%</div>
+                            </div>
+                            <div class="stat-card" style="padding: 15px;">
+                                <div class="stat-label">Avg Quality</div>
+                                <div class="stat-value" style="font-size: 20px;">4.8 ★</div>
+                            </div>
+                            <div class="stat-card" style="padding: 15px;">
+                                <div class="stat-label">Task Efficiency</div>
+                                <div class="stat-value" style="font-size: 20px;">87%</div>
+                            </div>
+                            <div class="stat-card" style="padding: 15px;">
+                                <div class="stat-label">Network Growth</div>
+                                <div class="stat-value" style="font-size: 20px;">+12%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports View -->
+            <div id="reportsView" class="page-section">
+                <div class="admin-card">
+                    <div class="admin-card-header">
+                        <h3>📎 Strategic Export Hub</h3>
+                    </div>
+                    <div class="admin-card-body">
+                        <div class="reports-grid">
+                            <div class="report-item">
+                                <div class="report-icon">📋</div>
+                                <div class="report-info">
+                                    <h4>Mission Registry</h4>
+                                    <p>Full audit trail of all operational tasks, priorities, and status nodes.</p>
+                                </div>
+                                <button class="btn btn-primary" onclick="generateReport('tasks')">Export CSV</button>
+                            </div>
+                            <div class="report-item">
+                                <div class="report-icon">👥</div>
+                                <div class="report-info">
+                                    <h4>Talent Analytics</h4>
+                                    <p>Comprehensive worker profiles, performance metrics, and engagement data.</p>
+                                </div>
+                                <button class="btn btn-primary" onclick="generateReport('workers')">Export CSV</button>
+                            </div>
+                            <div class="report-item">
+                                <div class="report-icon">💰</div>
+                                <div class="report-info">
+                                    <h4>Financial Ledger</h4>
+                                    <p>Consolidated wage summary and disbursement records for fiscal audit.</p>
+                                </div>
+                                <button class="btn btn-primary" onclick="generateReport('financial')">Export CSV</button>
+                            </div>
+                            <div class="report-item">
+                                <div class="report-icon">📈</div>
+                                <div class="report-info">
+                                    <h4>Trend Analysis</h4>
+                                    <p>Historical velocity data and task completion trajectories.</p>
+                                </div>
+                                <button class="btn btn-primary" onclick="generateReport('trends')">Export CSV</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -601,7 +733,7 @@
                 item.classList.remove('active');
             });
             
-            const activeItem = document.querySelector(`.nav-item[onclick*="${pageId}"]`);
+            const activeItem = document.querySelector(`.nav-item[onclick*="\${pageId}"]`);
             if (activeItem) {
                 activeItem.classList.add('active');
             }
@@ -638,6 +770,28 @@
 
         // --- Functional Handlers (Restored) ---
 
+        function deployMission(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new URLSearchParams(new FormData(form));
+            
+            fetch('${pageContext.request.contextPath}/CreateTaskServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast(result.message, 'success');
+                      form.reset();
+                      // Switch to tasks page to see the new task or stay on dashboard
+                      // For now, let's just stay and show success
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
         function showToast(message, type = 'info') {
             let container = document.querySelector('.toast-container');
             if (!container) {
@@ -662,7 +816,18 @@
               .then(result => {
                   if (result.success) {
                       showToast('Worker approved successfully!', 'success');
-                      setTimeout(() => location.reload(), 1000);
+                      // Remove the row or update status without reload
+                      const row = btn.closest('tr');
+                      if (row) {
+                          const statusBadge = row.querySelector('.status-badge');
+                          if (statusBadge) {
+                              statusBadge.className = 'status-badge approved';
+                              statusBadge.textContent = 'APPROVED';
+                          }
+                          btn.remove();
+                      }
+                      // If in dashboard pending approvals table, remove row
+                      if (btn.closest('#dashboardView')) row.remove();
                   } else {
                       showToast('Error: ' + result.message, 'error');
                   }
@@ -679,7 +844,9 @@
               .then(result => {
                   if (result.success) {
                       showToast('Submission approved and payment recorded!', 'success');
-                      setTimeout(() => location.reload(), 1000);
+                      // Dynamically remove the submission card or row
+                      const container = btn.closest('.submission-card') || btn.closest('tr');
+                      if (container) container.remove();
                   } else {
                       showToast('Error: ' + result.message, 'error');
                   }
@@ -697,7 +864,8 @@
               .then(result => {
                   if (result.success) {
                       showToast('Submission rejected.', 'warning');
-                      setTimeout(() => location.reload(), 1000);
+                      const container = btn.closest('.submission-card') || btn.closest('tr');
+                      if (container) container.remove();
                   }
               });
         }
@@ -712,7 +880,13 @@
               .then(result => {
                   if (result.success) {
                       showToast('Payment marked as disbursed!', 'success');
-                      setTimeout(() => location.reload(), 1000);
+                      const row = btn.closest('tr');
+                      if (row) {
+                          const earningsCell = row.cells[2];
+                          if (earningsCell) earningsCell.style.textDecoration = 'line-through';
+                          btn.disabled = true;
+                          btn.textContent = 'Paid';
+                      }
                   }
               });
         }
@@ -787,7 +961,16 @@
               .then(result => {
                   if (result.success) {
                       showToast(result.message, 'success');
-                      setTimeout(() => location.reload(), 1000);
+                      // Update the worker row in the table dynamically
+                      const row = document.querySelector(`button[onclick*="manageWorker(\${id},"]`)?.closest('tr');
+                      if (row) {
+                          const statusBadge = row.querySelector('.status-badge');
+                          if (statusBadge) {
+                              statusBadge.className = 'status-badge ' + newStatus.toLowerCase();
+                              statusBadge.textContent = newStatus.toUpperCase();
+                          }
+                      }
+                      closeWorkerModal();
                   } else {
                       showToast(result.message, 'error');
                   }
@@ -831,15 +1014,102 @@
               .then(result => {
                   if (result.success) {
                       showToast(result.message, 'success');
-                      setTimeout(() => location.reload(), 1000);
+                      const row = document.querySelector(`button[onclick*="manageWorker(\${id},"]`)?.closest('tr');
+                      if (row) row.remove();
+                      closeWorkerModal();
                   } else {
                       showToast(result.message, 'error');
                   }
               }).catch(err => showToast('Network error', 'error'));
         }
 
+        function generateReport(type) {
+            showToast('Preparing ' + type + ' report...', 'info');
+            window.location.href = '${pageContext.request.contextPath}/export-report?type=' + type;
+        }
+
+        function initCharts() {
+            // Data from backend
+            <%
+                List<Map<String, Object>> trends = (List<Map<String, Object>>) request.getAttribute("taskTrends");
+                List<Map<String, Object>> cats = (List<Map<String, Object>>) request.getAttribute("tasksByCategory");
+                
+                StringBuilder trendLabels = new StringBuilder();
+                StringBuilder completedData = new StringBuilder();
+                StringBuilder openData = new StringBuilder();
+                
+                if (trends != null) {
+                    for (Map<String, Object> t : trends) {
+                        trendLabels.append("'").append(t.get("date")).append("',");
+                        completedData.append(t.get("completed")).append(",");
+                        openData.append(t.get("open")).append(",");
+                    }
+                }
+                
+                StringBuilder catLabels = new StringBuilder();
+                StringBuilder catData = new StringBuilder();
+                if (cats != null) {
+                    for (Map<String, Object> c : cats) {
+                        catLabels.append("'").append(c.get("category")).append("',");
+                        catData.append(c.get("count")).append(",");
+                    }
+                }
+            %>
+
+            // Trends Chart
+            const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+            new Chart(trendsCtx, {
+                type: 'line',
+                data: {
+                    labels: [<%= trendLabels.toString() %>],
+                    datasets: [{
+                        label: 'Completed',
+                        data: [<%= completedData.toString() %>],
+                        borderColor: '#059669',
+                        tension: 0.4,
+                        fill: true,
+                        backgroundColor: 'rgba(5, 150, 105, 0.1)'
+                    }, {
+                        label: 'Open',
+                        data: [<%= openData.toString() %>],
+                        borderColor: '#2563eb',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Category Chart
+            const catCtx = document.getElementById('categoryChart').getContext('2d');
+            new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [<%= catLabels.toString() %>],
+                    datasets: [{
+                        data: [<%= catData.toString() %>],
+                        backgroundColor: ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
         // Handle URL parameters for alerts
         window.onload = function() {
+            // Restore last active tab if exists
+            const activeTab = localStorage.getItem('admin_active_tab') || 'dashboard';
+            switchToPage(activeTab);
+
+            initCharts();
+
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('success')) {
                 showAlert('alertContainer', urlParams.get('success'), 'success');

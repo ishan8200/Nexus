@@ -52,11 +52,13 @@ public class AdminController extends HttpServlet {
         int pendingSubmissions = taskDAO.getPendingSubmissionCount();
         
         List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5);
-        List<Map<String, Object>> pendingWorkersList = userDAO.getPendingWorkersList();
+        List<User> pendingWorkersList = userDAO.getPendingWorkersList();
         List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList();
-        List<Map<String, Object>> allWorkers = userDAO.getAllWorkersWithStats();
+        List<User> allWorkers = userDAO.getAllWorkersWithStats();
         List<Map<String, Object>> allTasks = taskDAO.getAllTasks();
         List<Map<String, Object>> wageSummary = wageDAO.getWageSummary();
+        List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends();
+        List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory();
         
         request.setAttribute("totalTasks", totalTasks);
         request.setAttribute("completedTasks", completedTasks);
@@ -69,6 +71,8 @@ public class AdminController extends HttpServlet {
         request.setAttribute("allWorkers", allWorkers);
         request.setAttribute("allTasks", allTasks);
         request.setAttribute("wageSummary", wageSummary);
+        request.setAttribute("taskTrends", taskTrends);
+        request.setAttribute("tasksByCategory", tasksByCategory);
         request.setAttribute("currentUser", currentUser);
         
         request.getRequestDispatcher("/WEB-INF/pages/adminDash.jsp").forward(request, response);

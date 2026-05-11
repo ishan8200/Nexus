@@ -17,7 +17,7 @@
     --nexus-surface: #ffffff;
     --nexus-elevated: #d6cdcd;
     --nexus-border: #e2e8f0;
-    --nexus-border-glow: #cbd5e1;
+    --nexus-border-glow: #b2c9e6;
     
     /* Enhanced accent & status colors */
     --nexus-accent: #3b82f6;
@@ -1533,7 +1533,7 @@ footer {
 
 /* Enhanced Card Styles */
 .admin-card {
-    background: linear-gradient(135deg, var(--nexus-elevated) 0%, rgba(255, 255, 255, 0.95) 100%);
+    background: #F1EEEB;
     border: 1px solid var(--nexus-border);
     border-radius: var(--radius-2xl);
     overflow: hidden;
@@ -1894,6 +1894,28 @@ footer {
     display: flex;
     justify-content: flex-end;
     gap: var(--space-sm);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 500px;
+    max-width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* Form Select & Textarea */

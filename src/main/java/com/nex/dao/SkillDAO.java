@@ -6,25 +6,25 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.nex.config.DBConnection;
+import com.nex.model.Skill;
 
 public class SkillDAO {
 
-    public List<Map<String, Object>> getAllSkills() {
-        List<Map<String, Object>> skills = new ArrayList<>();
+    public List<Skill> getAllSkills() {
+        List<Skill> skills = new ArrayList<>();
         String sql = "SELECT * FROM skills ORDER BY skill_name ASC";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
             while (rs.next()) {
-                Map<String, Object> skill = new HashMap<>();
-                skill.put("id", rs.getInt("id"));
-                skill.put("skill_name", rs.getString("skill_name"));
-                skill.put("category", rs.getString("category"));
+                Skill skill = new Skill();
+                skill.setId(rs.getInt("id"));
+                skill.setSkillName(rs.getString("skill_name"));
+                skill.setCategory(rs.getString("category"));
+                skill.setCreatedAt(rs.getTimestamp("created_at"));
                 skills.add(skill);
             }
         } catch (SQLException e) {
@@ -33,8 +33,8 @@ public class SkillDAO {
         return skills;
     }
 
-    public List<Map<String, Object>> getWorkerSkills(int workerId) {
-        List<Map<String, Object>> skills = new ArrayList<>();
+    public List<Skill> getWorkerSkills(int workerId) {
+        List<Skill> skills = new ArrayList<>();
         String sql = "SELECT s.*, ws.proficiency_level FROM skills s " +
                      "JOIN worker_skills ws ON s.id = ws.skill_id " +
                      "WHERE ws.worker_id = ? ORDER BY s.skill_name ASC";
@@ -43,11 +43,12 @@ public class SkillDAO {
             pstmt.setInt(1, workerId);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
-                Map<String, Object> skill = new HashMap<>();
-                skill.put("id", rs.getInt("id"));
-                skill.put("skill_name", rs.getString("skill_name"));
-                skill.put("category", rs.getString("category"));
-                skill.put("proficiency_level", rs.getInt("proficiency_level"));
+                Skill skill = new Skill();
+                skill.setId(rs.getInt("id"));
+                skill.setSkillName(rs.getString("skill_name"));
+                skill.setCategory(rs.getString("category"));
+                skill.setProficiencyLevel(rs.getInt("proficiency_level"));
+                skill.setCreatedAt(rs.getTimestamp("created_at"));
                 skills.add(skill);
             }
         } catch (SQLException e) {
@@ -64,7 +65,11 @@ public class SkillDAO {
             pstmt.setInt(1, workerId);
             pstmt.setInt(2, skillId);
             pstmt.setInt(3, proficiency);
-            return pstmt.executeUpdate() > 0;
+            boolean success = pstmt.executeUpdate() > 0;
+            if (success) {
+                updateUserSkillsColumn(workerId);
+            }
+            return success;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
@@ -114,6 +119,7 @@ public class SkillDAO {
             }
 
             conn.commit();
+            updateUserSkillsColumn(workerId);
             return true;
         } catch (SQLException e) {
             if (conn != null) {
@@ -134,10 +140,40 @@ public class SkillDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, workerId);
             pstmt.setInt(2, skillId);
-            return pstmt.executeUpdate() > 0;
+            boolean success = pstmt.executeUpdate() > 0;
+            if (success) {
+                updateUserSkillsColumn(workerId);
+            }
+            return success;
         } catch (SQLException e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    /**
+     * Helper method to keep the legacy 'skills' column in users table in sync
+     * with the worker_skills table. This allows existing views and logic to 
+     * still function correctly while we transition to a normalized structure.
+     */
+    private void updateUserSkillsColumn(int workerId) {
+        List<Skill> skills = getWorkerSkills(workerId);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < skills.size(); i++) {
+            sb.append(skills.get(i).getSkillName());
+            if (i < skills.size() - 1) {
+                sb.append(", ");
+            }
+        }
+        
+        String sql = "UPDATE users SET skills = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, sb.toString());
+            pstmt.setInt(2, workerId);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 }

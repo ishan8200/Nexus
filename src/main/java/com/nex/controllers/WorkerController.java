@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.nex.dao.TaskDAO;
 import com.nex.dao.UserDAO;
+import com.nex.model.Skill;
 import com.nex.model.User;
 
 import jakarta.servlet.ServletException;
@@ -54,18 +55,22 @@ public class WorkerController extends HttpServlet {
         // Load worker data
         Map<String, Object> stats = userDAO.getWorkerStats(currentUser.getId());
         List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks();
-        List<Map<String, Object>> myTasks = userDAO.getMyTasks(currentUser.getId());
+        List<Map<String, Object>> myTasks = taskDAO.getWorkerTasks(currentUser.getId());
         List<Map<String, Object>> earningsHistory = userDAO.getWorkerEarnings(currentUser.getId());
         List<Map<String, Object>> notifications = notificationDAO.getNotificationsForUser(currentUser.getId());
-        List<Map<String, Object>> allSkills = skillDAO.getAllSkills();
-        List<Map<String, Object>> workerSkills = skillDAO.getWorkerSkills(currentUser.getId());
+        List<Skill> allSkills = skillDAO.getAllSkills();
+        List<Skill> workerSkills = skillDAO.getWorkerSkills(currentUser.getId());
         List<Map<String, Object>> performance = taskDAO.getCompletedTasksWithRatings(currentUser.getId());
         
         request.setAttribute("totalEarned", stats.get("total_earned"));
         request.setAttribute("tasksCompleted", stats.get("tasks_completed"));
         request.setAttribute("avgRating", stats.get("avg_rating"));
         request.setAttribute("pendingPayment", stats.get("pending_payment"));
+        request.setAttribute("completionRate", stats.get("completion_rate"));
+        request.setAttribute("lateSubmissions", stats.get("late_submissions"));
+
         request.setAttribute("availableTasks", availableTasks);
+
         request.setAttribute("myTasks", myTasks);
         request.setAttribute("earningsHistory", earningsHistory);
         request.setAttribute("notifications", notifications);

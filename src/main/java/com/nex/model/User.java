@@ -1,6 +1,7 @@
 package com.nex.model;
 
 import java.sql.Timestamp;
+import java.util.List;
 
 public class User {
     private int id;
@@ -13,9 +14,13 @@ public class User {
     private String status;
     private String profilePic;
     private String skills;
+    private List<Skill> skillList;
     private double rating;
+    private double avgRating;
     private double totalEarned;
     private int tasksCompleted;
+    private int assignedTasks;
+    private int submissionsMade;
     private Timestamp createdAt;
     private Timestamp lastLogin;
     
@@ -63,14 +68,26 @@ public class User {
     public String getSkills() { return skills; }
     public void setSkills(String skills) { this.skills = skills; }
     
+    public List<Skill> getSkillList() { return skillList; }
+    public void setSkillList(List<Skill> skillList) { this.skillList = skillList; }
+    
     public double getRating() { return rating; }
     public void setRating(double rating) { this.rating = rating; }
+    
+    public double getAvgRating() { return avgRating; }
+    public void setAvgRating(double avgRating) { this.avgRating = avgRating; }
     
     public double getTotalEarned() { return totalEarned; }
     public void setTotalEarned(double totalEarned) { this.totalEarned = totalEarned; }
     
     public int getTasksCompleted() { return tasksCompleted; }
     public void setTasksCompleted(int tasksCompleted) { this.tasksCompleted = tasksCompleted; }
+    
+    public int getAssignedTasks() { return assignedTasks; }
+    public void setAssignedTasks(int assignedTasks) { this.assignedTasks = assignedTasks; }
+    
+    public int getSubmissionsMade() { return submissionsMade; }
+    public void setSubmissionsMade(int submissionsMade) { this.submissionsMade = submissionsMade; }
     
     public Timestamp getCreatedAt() { return createdAt; }
     public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
