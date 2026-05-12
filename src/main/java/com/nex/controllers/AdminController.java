@@ -45,18 +45,36 @@ public class AdminController extends HttpServlet {
         }
         
         // Load dashboard data
-        int totalTasks = taskDAO.getTotalTaskCount();
+        // Get sorting parameters
+        String taskSortBy = request.getParameter("taskSortBy");
+        String taskSortDir = request.getParameter("taskSortDir");
+        String workerSortBy = request.getParameter("workerSortBy");
+        String workerSortDir = request.getParameter("workerSortDir");
+        String wageSortBy = request.getParameter("wageSortBy");
+        String wageSortDir = request.getParameter("wageSortDir");
+        String paymentSortBy = request.getParameter("paymentSortBy");
+        String paymentSortDir = request.getParameter("paymentSortDir");
+        
+        // Get search parameters
+        String taskSearch = request.getParameter("taskSearch");
+        String workerSearch = request.getParameter("workerSearch");
+        String wageSearch = request.getParameter("wageSearch");
+        String paymentSearch = request.getParameter("paymentSearch");
+
+        int totalTasks = taskDAO.getTaskCount();
         int completedTasks = taskDAO.getCompletedTaskCount();
         int activeWorkers = userDAO.getActiveWorkerCount();
-        double wagesDisbursed = wageDAO.getTotalWagesDisbursed();
+        double wagesDisbursed = wageDAO.getTotalWagesPaid();
         int pendingSubmissions = taskDAO.getPendingSubmissionCount();
-        
+
         List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5);
         List<User> pendingWorkersList = userDAO.getPendingWorkersList();
         List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList();
-        List<User> allWorkers = userDAO.getAllWorkersWithStats();
-        List<Map<String, Object>> allTasks = taskDAO.getAllTasks();
+        List<User> allWorkers = userDAO.getAllWorkers(workerSortBy, workerSortDir, workerSearch);
+        List<Map<String, Object>> allTasks = taskDAO.getAllTasks(taskSortBy, taskSortDir, taskSearch);
         List<Map<String, Object>> wageSummary = wageDAO.getWageSummary();
+        List<Map<String, Object>> pendingWages = wageDAO.getPendingWagesWithDetails(wageSortBy, wageSortDir, wageSearch);
+        List<Map<String, Object>> paidWages = wageDAO.getPaidWagesWithDetails(paymentSortBy, paymentSortDir, paymentSearch);
         List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends();
         List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory();
         
@@ -71,9 +89,25 @@ public class AdminController extends HttpServlet {
         request.setAttribute("allWorkers", allWorkers);
         request.setAttribute("allTasks", allTasks);
         request.setAttribute("wageSummary", wageSummary);
+        request.setAttribute("pendingWages", pendingWages);
+        request.setAttribute("paidWages", paidWages);
         request.setAttribute("taskTrends", taskTrends);
         request.setAttribute("tasksByCategory", tasksByCategory);
         request.setAttribute("currentUser", currentUser);
+        
+        // Preserve sort and search parameters
+        request.setAttribute("taskSortBy", taskSortBy);
+        request.setAttribute("taskSortDir", taskSortDir);
+        request.setAttribute("workerSortBy", workerSortBy);
+        request.setAttribute("workerSortDir", workerSortDir);
+        request.setAttribute("wageSortBy", wageSortBy);
+        request.setAttribute("wageSortDir", wageSortDir);
+        request.setAttribute("paymentSortBy", paymentSortBy);
+        request.setAttribute("paymentSortDir", paymentSortDir);
+        request.setAttribute("taskSearch", taskSearch);
+        request.setAttribute("workerSearch", workerSearch);
+        request.setAttribute("wageSearch", wageSearch);
+        request.setAttribute("paymentSearch", paymentSearch);
         
         request.getRequestDispatcher("/WEB-INF/pages/adminDash.jsp").forward(request, response);
     }

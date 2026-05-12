@@ -15,6 +15,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
     <style>
         /* Home page additional styles */
@@ -560,13 +561,12 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <span class="logo-mark">⌘</span>
-                <span class="logo-text">NEXUS</span>
+                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/" class="active">Home</a>
-                <a href="#">Platform</a>
-                <a href="#">Documentation</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
                 <% if (currentUser != null) { %>
                     <% if ("admin".equals(currentUser.getRole())) { %>
                         <a href="${pageContext.request.contextPath}/admin" class="btn-login-nav">Dashboard</a>
@@ -623,7 +623,7 @@
             <div class="grid-2">
                 <!-- Admin Control Card -->
                 <div class="card">
-                    <div class="card-icon">⚙️</div>
+                    <div class="card-icon"><i class="fas fa-user-shield" style="color: var(--nexus-accent);"></i></div>
                     <h3>ADMIN CONTROL</h3>
                     <p>Full-spectrum governance with granular permission layers and real-time oversight of every project node.</p>
                     <ul class="feature-list">
@@ -636,7 +636,7 @@
                 
                 <!-- Worker Velocity Card -->
                 <div class="card">
-                    <div class="card-icon">⚡</div>
+                    <div class="card-icon"><i class="fas fa-bolt-lightning" style="color: var(--nexus-warning);"></i></div>
                     <h3>WORKER VELOCITY</h3>
                     <p>Streamlined execution workflows that eliminate friction. Focused views for high-impact task delivery.</p>
                     <ul class="feature-list">
@@ -667,19 +667,19 @@
             <div class="media-grid">
                 <div class="media-card">
                     <div class="media-placeholder">
-                        <div class="video-badge">▶ VIDEO PREVIEW</div>
+                        <div class="video-badge"><i class="fas fa-circle-play" style="margin-right: 8px;"></i> VIDEO PREVIEW</div>
                     </div>
                     <div class="media-caption">Walkthrough: Nexus Core Architecture</div>
                 </div>
                 <div class="media-card">
                     <div class="media-placeholder">
-                        <div class="map-badge">🌍 GLOBAL NODE MAP</div>
+                        <div class="map-badge"><i class="fas fa-earth-americas" style="margin-right: 8px;"></i> GLOBAL NODE MAP</div>
                     </div>
                     <div class="media-caption">Real-time Geographic Distribution</div>
                 </div>
                 <div class="media-card">
                     <div class="media-placeholder">
-                        <div class="chart-badge">📈 METRIC FLOW</div>
+                        <div class="chart-badge"><i class="fas fa-chart-area" style="margin-right: 8px;"></i> METRIC FLOW</div>
                     </div>
                     <div class="media-caption">Project Velocity Analytics</div>
                 </div>

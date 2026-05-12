@@ -74,6 +74,10 @@ public class WageDAO {
         }
     }
     
+    public double getTotalWagesPaid() {
+        return getTotalWagesDisbursed();
+    }
+
     public double getTotalWagesDisbursed() {
         String sql = "SELECT COALESCE(SUM(amount), 0) FROM wages WHERE status = 'paid'";
         try (Connection conn = DBConnection.getConnection();
@@ -98,6 +102,126 @@ public class WageDAO {
         return 0;
     }
     
+    public List<Map<String, Object>> getPendingWagesWithDetails(String sortBy, String sortDir, String search) {
+        List<Map<String, Object>> pending = new ArrayList<>();
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("worker", "u.full_name");
+        allowedCols.put("task", "t.title");
+        allowedCols.put("amount", "w.amount");
+        allowedCols.put("date", "w.created_at");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "w.created_at");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT w.id as wage_id, w.amount, w.created_at, u.full_name as worker_name, t.title as task_title " +
+                     "FROM wages w " +
+                     "JOIN users u ON w.worker_id = u.id " +
+                     "JOIN tasks t ON w.task_id = t.id " +
+                     "WHERE w.status = 'pending'");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND (u.full_name LIKE ? OR t.title LIKE ?)");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                pstmt.setString(1, searchPattern);
+                pstmt.setString(2, searchPattern);
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("wage_id", rs.getInt("wage_id"));
+                    item.put("amount", rs.getDouble("amount"));
+                    item.put("worker_name", rs.getString("worker_name"));
+                    item.put("task_title", rs.getString("task_title"));
+                    item.put("created_at", rs.getTimestamp("created_at"));
+                    pending.add(item);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return pending;
+    }
+
+    public List<Map<String, Object>> getPendingWagesWithDetails(String sortBy, String sortDir) {
+        return getPendingWagesWithDetails(sortBy, sortDir, null);
+    }
+
+    public List<Map<String, Object>> getPendingWagesWithDetails() {
+        return getPendingWagesWithDetails("date", "DESC");
+    }
+
+    public List<Map<String, Object>> getPaidWagesWithDetails(String sortBy, String sortDir, String search) {
+        List<Map<String, Object>> paid = new ArrayList<>();
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("worker", "u.full_name");
+        allowedCols.put("task", "t.title");
+        allowedCols.put("amount", "w.amount");
+        allowedCols.put("date", "w.paid_at");
+        allowedCols.put("method", "w.payment_method");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "w.paid_at");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT w.id as wage_id, w.amount, w.paid_at, w.payment_method, w.transaction_id, u.full_name as worker_name, t.title as task_title " +
+                     "FROM wages w " +
+                     "JOIN users u ON w.worker_id = u.id " +
+                     "JOIN tasks t ON w.task_id = t.id " +
+                     "WHERE w.status = 'paid'");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND (u.full_name LIKE ? OR t.title LIKE ? OR w.transaction_id LIKE ?)");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                pstmt.setString(1, searchPattern);
+                pstmt.setString(2, searchPattern);
+                pstmt.setString(3, searchPattern);
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("wage_id", rs.getInt("wage_id"));
+                    item.put("amount", rs.getDouble("amount"));
+                    item.put("worker_name", rs.getString("worker_name"));
+                    item.put("task_title", rs.getString("task_title"));
+                    item.put("paid_at", rs.getTimestamp("paid_at"));
+                    item.put("payment_method", rs.getString("payment_method"));
+                    item.put("transaction_id", rs.getString("transaction_id"));
+                    paid.add(item);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return paid;
+    }
+
+    public List<Map<String, Object>> getPaidWagesWithDetails(String sortBy, String sortDir) {
+        return getPaidWagesWithDetails(sortBy, sortDir, null);
+    }
+
+    public List<Map<String, Object>> getPaidWagesWithDetails() {
+        return getPaidWagesWithDetails("date", "DESC");
+    }
+
     public List<Map<String, Object>> getWageSummary() {
         List<Map<String, Object>> summary = new ArrayList<>();
         String sql = "SELECT u.id as worker_id, u.full_name, u.tasks_completed, u.total_earned, " +
@@ -217,6 +341,46 @@ public class WageDAO {
     
     // ==================== HELPER METHODS ====================
     
+    public List<Map<String, Object>> getWorkerEarnings(int workerId, String sortBy, String sortDir) {
+        List<Map<String, Object>> earnings = new ArrayList<>();
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("month", "month");
+        allowedCols.put("tasks", "task_count");
+        allowedCols.put("amount", "total_amount");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "month");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        // Use a subquery to sort the results of the aggregation
+        String sql = "SELECT * FROM ( " +
+                     "  SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, " +
+                     "  COUNT(id) AS task_count, SUM(amount) AS total_amount " +
+                     "  FROM wages WHERE worker_id = ? " +
+                     "  GROUP BY DATE_FORMAT(created_at, '%Y-%m') " +
+                     ") AS results ORDER BY " + orderBy + " " + dir;
+                     
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, workerId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> earning = new HashMap<>();
+                earning.put("month", rs.getString("month"));
+                earning.put("task_count", rs.getInt("task_count"));
+                earning.put("total_amount", rs.getDouble("total_amount"));
+                earnings.add(earning);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return earnings;
+    }
+
+    public List<Map<String, Object>> getWorkerEarnings(int workerId) {
+        return getWorkerEarnings(workerId, "month", "DESC");
+    }
+
     private Wage extractWageFromResultSet(ResultSet rs) throws SQLException {
         Wage wage = new Wage();
         wage.setId(rs.getInt("id"));

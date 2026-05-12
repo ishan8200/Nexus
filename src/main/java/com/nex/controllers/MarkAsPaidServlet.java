@@ -41,18 +41,27 @@ public class MarkAsPaidServlet extends HttpServlet {
         }
 
         try {
-            int workerId = Integer.parseInt(request.getParameter("workerId"));
+            String wageIdParam = request.getParameter("wageId");
+            String workerIdParam = request.getParameter("workerId");
             String transactionId = "TXN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
             
-            boolean success = wageDAO.markWorkerWagesAsPaid(workerId, currentUser.getId(), transactionId);
+            boolean success = false;
+            
+            if (wageIdParam != null && !wageIdParam.isEmpty()) {
+                int wageId = Integer.parseInt(wageIdParam);
+                success = wageDAO.markAsPaid(wageId, currentUser.getId(), transactionId, "System Transfer");
+            } else if (workerIdParam != null && !workerIdParam.isEmpty()) {
+                int workerId = Integer.parseInt(workerIdParam);
+                success = wageDAO.markWorkerWagesAsPaid(workerId, currentUser.getId(), transactionId);
+            }
             
             if (success) {
                 out.print("{\"success\": true, \"message\": \"Payment processed! TXN: " + transactionId + "\"}");
             } else {
-                out.print("{\"success\": false, \"message\": \"No pending wages found for this worker.\" }");
+                out.print("{\"success\": false, \"message\": \"Failed to process payment. Record not found or already paid.\" }");
             }
         } catch (Exception e) {
-            out.print("{\"success\": false, \"message\": \"Invalid worker ID\"}");
+            out.print("{\"success\": false, \"message\": \"Invalid parameters: " + e.getMessage() + "\"}");
         }
     }
 }

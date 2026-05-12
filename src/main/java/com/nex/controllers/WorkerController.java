@@ -52,15 +52,34 @@ public class WorkerController extends HttpServlet {
             return;
         }
         
+        // Get sorting and search parameters
+        String availSortBy = request.getParameter("availSortBy");
+        String availSortDir = request.getParameter("availSortDir");
+        String availSearch = request.getParameter("availSearch");
+        
+        String mySortBy = request.getParameter("mySortBy");
+        String mySortDir = request.getParameter("mySortDir");
+        String mySearch = request.getParameter("mySearch");
+        
+        String perfSortBy = request.getParameter("perfSortBy");
+        String perfSortDir = request.getParameter("perfSortDir");
+        String perfSearch = request.getParameter("perfSearch");
+        
+        String earnSortBy = request.getParameter("earnSortBy");
+        String earnSortDir = request.getParameter("earnSortDir");
+
         // Load worker data
         Map<String, Object> stats = userDAO.getWorkerStats(currentUser.getId());
-        List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks();
-        List<Map<String, Object>> myTasks = taskDAO.getWorkerTasks(currentUser.getId());
-        List<Map<String, Object>> earningsHistory = userDAO.getWorkerEarnings(currentUser.getId());
+        List<Map<String, Object>> availableTasks = taskDAO.getAvailableTasks(availSortBy, availSortDir, availSearch);
+        List<Map<String, Object>> myTasks = taskDAO.getWorkerTasks(currentUser.getId(), mySortBy, mySortDir, mySearch);
+        
+        com.nex.dao.WageDAO wageDAO = new com.nex.dao.WageDAO();
+        List<Map<String, Object>> earningsHistory = wageDAO.getWorkerEarnings(currentUser.getId(), earnSortBy, earnSortDir);
+        
         List<Map<String, Object>> notifications = notificationDAO.getNotificationsForUser(currentUser.getId());
         List<Skill> allSkills = skillDAO.getAllSkills();
         List<Skill> workerSkills = skillDAO.getWorkerSkills(currentUser.getId());
-        List<Map<String, Object>> performance = taskDAO.getCompletedTasksWithRatings(currentUser.getId());
+        List<Map<String, Object>> performance = taskDAO.getCompletedTasksWithRatings(currentUser.getId(), perfSortBy, perfSortDir, perfSearch);
         
         request.setAttribute("totalEarned", stats.get("total_earned"));
         request.setAttribute("tasksCompleted", stats.get("tasks_completed"));
@@ -78,6 +97,19 @@ public class WorkerController extends HttpServlet {
         request.setAttribute("workerSkills", workerSkills);
         request.setAttribute("performance", performance);
         request.setAttribute("currentUser", currentUser);
+
+        // Preserve parameters
+        request.setAttribute("availSortBy", availSortBy);
+        request.setAttribute("availSortDir", availSortDir);
+        request.setAttribute("availSearch", availSearch);
+        request.setAttribute("mySortBy", mySortBy);
+        request.setAttribute("mySortDir", mySortDir);
+        request.setAttribute("mySearch", mySearch);
+        request.setAttribute("perfSortBy", perfSortBy);
+        request.setAttribute("perfSortDir", perfSortDir);
+        request.setAttribute("perfSearch", perfSearch);
+        request.setAttribute("earnSortBy", earnSortBy);
+        request.setAttribute("earnSortDir", earnSortDir);
         
         request.getRequestDispatcher("/WEB-INF/pages/workerDash.jsp").forward(request, response);
     }

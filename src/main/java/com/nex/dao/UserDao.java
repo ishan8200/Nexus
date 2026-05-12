@@ -133,19 +133,54 @@ public class UserDAO {
         return null;
     }
     
-    public List<User> getAllWorkers() {
+    public List<User> getAllWorkers(String sortBy, String sortDir, String search) {
         List<User> workers = new ArrayList<>();
-        String sql = "SELECT * FROM users WHERE role = 'worker' ORDER BY created_at DESC";
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("full_name", "full_name");
+        allowedCols.put("tasks", "tasks_completed");
+        allowedCols.put("rating", "rating");
+        allowedCols.put("earned", "total_earned");
+        allowedCols.put("status", "status");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "created_at");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT * FROM users WHERE role = 'worker'");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND (full_name LIKE ? OR email LIKE ? OR status LIKE ? OR skills LIKE ?)");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                workers.add(extractUserFromResultSet(rs));
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                for (int i = 1; i <= 4; i++) {
+                    pstmt.setString(i, searchPattern);
+                }
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    workers.add(extractUserFromResultSet(rs));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return workers;
+    }
+
+    public List<User> getAllWorkers(String sortBy, String sortDir) {
+        return getAllWorkers(sortBy, sortDir, null);
+    }
+
+    public List<User> getAllWorkers() {
+        return getAllWorkers("created_at", "DESC");
     }
     
     public List<User> getAllWorkersWithStats() {
@@ -413,7 +448,20 @@ public class UserDAO {
             return false;
         }
     }
-    
+
+    public boolean updateProfilePicture(int userId, String profilePic) {
+        String sql = "UPDATE users SET profile_pic = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, profilePic);
+            pstmt.setInt(2, userId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     // ==================== HELPER METHODS ====================
     
     private User extractUserFromResultSet(ResultSet rs) throws SQLException {

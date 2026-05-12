@@ -14,6 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
     <script src="${pageContext.request.contextPath}/js/alert.js"></script>
 </head>
@@ -22,13 +23,12 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <span class="logo-mark">⌘</span>
-                <span class="logo-text">NEXUS</span>
+                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
-                <a href="${pageContext.request.contextPath}/" class="active">Home</a>
-                <a href="#">Platform</a>
-                <a href="#">Documentation</a>
+                <a href="${pageContext.request.contextPath}/">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
                 <% if (currentUser != null) { %>
                     <% if ("admin".equals(currentUser.getRole())) { %>
                         <a href="${pageContext.request.contextPath}/admin" class="btn-login-nav">Dashboard</a>

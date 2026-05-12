@@ -63,11 +63,15 @@ public class ApproveSubmissionServlet extends HttpServlet {
                 String reason = request.getParameter("reason");
                 
                 // Get worker info before rejection for notification
+                // Note: submissionId from request is actually assignmentId (ta.id)
+                int assignmentId = submissionId;
                 int workerId = -1;
                 String taskTitle = "Unknown Task";
                 try (java.sql.Connection conn = com.nex.config.DBConnection.getConnection();
-                     java.sql.PreparedStatement pstmt = conn.prepareStatement("SELECT ts.worker_id, t.title FROM task_submissions ts JOIN tasks t ON ts.task_id = t.id WHERE ts.id = ?")) {
-                    pstmt.setInt(1, submissionId);
+                     java.sql.PreparedStatement pstmt = conn.prepareStatement(
+                         "SELECT ta.worker_id, t.title FROM task_assignments ta " +
+                         "JOIN tasks t ON ta.task_id = t.id WHERE ta.id = ?")) {
+                    pstmt.setInt(1, assignmentId);
                     java.sql.ResultSet rs = pstmt.executeQuery();
                     if (rs.next()) {
                         workerId = rs.getInt("worker_id");
@@ -75,7 +79,7 @@ public class ApproveSubmissionServlet extends HttpServlet {
                     }
                 }
 
-                boolean success = taskDAO.rejectSubmission(submissionId, currentUser.getId(), reason);
+                boolean success = taskDAO.rejectSubmission(assignmentId, currentUser.getId(), reason);
                 if (success) {
                     if (workerId != -1) {
                         notificationDAO.sendNotification(

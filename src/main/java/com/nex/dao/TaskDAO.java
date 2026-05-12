@@ -66,31 +66,67 @@ public class TaskDAO {
         return null;
     }
     
-    public List<Map<String, Object>> getAllTasks() {
+    public List<Map<String, Object>> getAllTasks(String sortBy, String sortDir, String search) {
         List<Map<String, Object>> tasks = new ArrayList<>();
-        String sql = "SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id ORDER BY t.created_at DESC";
+        
+        // Define allowed sort columns for security
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("title", "t.title");
+        allowedCols.put("priority", "t.priority");
+        allowedCols.put("status", "t.status");
+        allowedCols.put("wage", "t.wage");
+        allowedCols.put("deadline", "t.deadline");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "t.created_at");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" WHERE t.title LIKE ? OR t.priority LIKE ? OR t.status LIKE ? OR t.category LIKE ? OR u.full_name LIKE ?");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                Map<String, Object> task = new HashMap<>();
-                task.put("id", rs.getInt("id"));
-                task.put("title", rs.getString("title"));
-                task.put("description", rs.getString("description"));
-                task.put("wage", rs.getDouble("wage"));
-                task.put("wage_type", rs.getString("wage_type"));
-                task.put("deadline", rs.getDate("deadline").toString());
-                task.put("priority", rs.getString("priority"));
-                task.put("status", rs.getString("status"));
-                task.put("category", rs.getString("category"));
-                task.put("assignedToName", rs.getString("assigned_to_name"));
-                task.put("assigned_to", rs.getInt("assigned_to"));
-                tasks.add(task);
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                for (int i = 1; i <= 5; i++) {
+                    pstmt.setString(i, searchPattern);
+                }
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> task = new HashMap<>();
+                    task.put("id", rs.getInt("id"));
+                    task.put("title", rs.getString("title"));
+                    task.put("description", rs.getString("description"));
+                    task.put("wage", rs.getDouble("wage"));
+                    task.put("wage_type", rs.getString("wage_type"));
+                    task.put("deadline", rs.getDate("deadline") != null ? rs.getDate("deadline").toString() : "");
+                    task.put("priority", rs.getString("priority"));
+                    task.put("status", rs.getString("status"));
+                    task.put("category", rs.getString("category"));
+                    task.put("assignedToName", rs.getString("assigned_to_name"));
+                    task.put("assigned_to", rs.getInt("assigned_to"));
+                    tasks.add(task);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return tasks;
+    }
+
+    public List<Map<String, Object>> getAllTasks(String sortBy, String sortDir) {
+        return getAllTasks(sortBy, sortDir, null);
+    }
+
+    public List<Map<String, Object>> getAllTasks() {
+        return getAllTasks("created_at", "DESC");
     }
     
     public String getAllTasksAsJSON() {
@@ -209,6 +245,10 @@ public class TaskDAO {
     
     // ==================== TASK STATISTICS ====================
     
+    public int getTaskCount() {
+        return getTotalTaskCount();
+    }
+
     public int getTotalTaskCount() {
         String sql = "SELECT COUNT(*) FROM tasks";
         try (Connection conn = DBConnection.getConnection();
@@ -356,32 +396,61 @@ public class TaskDAO {
         return submissions;
     }
     
-    public List<Map<String, Object>> getAvailableTasks() {
+    public List<Map<String, Object>> getAvailableTasks(String sortBy, String sortDir, String search) {
         List<Map<String, Object>> tasks = new ArrayList<>();
-        String sql = "SELECT t.* FROM tasks t " +
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("title", "t.title");
+        allowedCols.put("wage", "t.wage");
+        allowedCols.put("deadline", "t.deadline");
+        allowedCols.put("priority", "t.priority");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "t.deadline");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT t.* FROM tasks t " +
                      "WHERE t.status = 'open' AND t.assigned_to IS NULL " +
-                     "AND NOT EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id AND ta.status NOT IN ('cancelled', 'rejected')) " +
-                     "ORDER BY t.deadline ASC";
+                     "AND NOT EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = t.id AND ta.status NOT IN ('cancelled', 'rejected'))");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND (t.title LIKE ? OR t.description LIKE ? OR t.priority LIKE ? OR t.category LIKE ?)");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                Map<String, Object> task = new HashMap<>();
-                task.put("id", rs.getInt("id"));
-                task.put("title", rs.getString("title"));
-                task.put("description", rs.getString("description"));
-                task.put("wage", rs.getDouble("wage"));
-                task.put("wage_type", rs.getString("wage_type"));
-                task.put("deadline", rs.getDate("deadline"));
-                task.put("priority", rs.getString("priority"));
-                task.put("category", rs.getString("category"));
-                task.put("estimated_hours", rs.getInt("estimated_hours"));
-                tasks.add(task);
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                for (int i = 1; i <= 4; i++) {
+                    pstmt.setString(i, searchPattern);
+                }
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> task = new HashMap<>();
+                    task.put("id", rs.getInt("id"));
+                    task.put("title", rs.getString("title"));
+                    task.put("description", rs.getString("description"));
+                    task.put("wage", rs.getDouble("wage"));
+                    task.put("wage_type", rs.getString("wage_type"));
+                    task.put("deadline", rs.getDate("deadline"));
+                    task.put("priority", rs.getString("priority"));
+                    task.put("category", rs.getString("category"));
+                    task.put("estimated_hours", rs.getInt("estimated_hours"));
+                    tasks.add(task);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return tasks;
+    }
+
+    public List<Map<String, Object>> getAvailableTasks() {
+        return getAvailableTasks("deadline", "ASC", null);
     }
     
     public boolean assignTaskToWorker(int taskId, int workerId) {
@@ -400,33 +469,66 @@ public class TaskDAO {
         return false;
     }
 
-    public List<Map<String, Object>> getWorkerTasks(int workerId) {
+    public List<Map<String, Object>> getWorkerTasks(int workerId, String sortBy, String sortDir, String search) {
         List<Map<String, Object>> tasks = new ArrayList<>();
-        String sql = "SELECT ta.id as assignment_id, ta.status as assignment_status, t.* " +
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("title", "t.title");
+        allowedCols.put("deadline", "t.deadline");
+        allowedCols.put("wage", "t.wage");
+        allowedCols.put("status", "ta.status");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "t.deadline");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT ta.id as assignment_id, ta.status as assignment_status, t.* " +
                      "FROM task_assignments ta " +
                      "JOIN tasks t ON ta.task_id = t.id " +
-                     "WHERE ta.worker_id = ? AND ta.status NOT IN ('approved', 'cancelled') " +
-                     "ORDER BY t.deadline ASC";
+                     "WHERE ta.worker_id = ? AND ta.status NOT IN ('approved', 'cancelled')");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND (t.title LIKE ? OR t.description LIKE ? OR t.status LIKE ?)");
+        }
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
             pstmt.setInt(1, workerId);
-            ResultSet rs = pstmt.executeQuery();
-            while (rs.next()) {
-                Map<String, Object> task = new HashMap<>();
-                task.put("assignment_id", rs.getInt("assignment_id"));
-                task.put("id", rs.getInt("id"));
-                task.put("title", rs.getString("title"));
-                task.put("description", rs.getString("description"));
-                task.put("wage", rs.getDouble("wage"));
-                task.put("deadline", rs.getDate("deadline"));
-                task.put("status", rs.getString("status"));
-                task.put("assignment_status", rs.getString("assignment_status"));
-                tasks.add(task);
+            if (search != null && !search.trim().isEmpty()) {
+                String searchPattern = "%" + search.trim() + "%";
+                for (int i = 2; i <= 4; i++) {
+                    pstmt.setString(i, searchPattern);
+                }
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> task = new HashMap<>();
+                    task.put("assignment_id", rs.getInt("assignment_id"));
+                    task.put("id", rs.getInt("id"));
+                    task.put("title", rs.getString("title"));
+                    task.put("description", rs.getString("description"));
+                    task.put("wage", rs.getDouble("wage"));
+                    task.put("deadline", rs.getDate("deadline") != null ? rs.getDate("deadline").toString() : "");
+                    task.put("status", rs.getString("status"));
+                    task.put("assignment_status", rs.getString("assignment_status"));
+                    tasks.add(task);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return tasks;
+    }
+
+    public List<Map<String, Object>> getWorkerTasks(int workerId, String sortBy, String sortDir) {
+        return getWorkerTasks(workerId, sortBy, sortDir, null);
+    }
+
+    public List<Map<String, Object>> getWorkerTasks(int workerId) {
+        return getWorkerTasks(workerId, "deadline", "ASC");
     }
 
     public boolean startTask(int assignmentId) {
@@ -586,29 +688,59 @@ public List<Map<String, Object>> getWorkerRatings(int workerId) {
     return ratings;
     }
 
-    public List<Map<String, Object>> getCompletedTasksWithRatings(int workerId) {
-    List<Map<String, Object>> performance = new ArrayList<>();
-    String sql = "SELECT t.title, t.wage, t.status as task_status, ts.rating, ts.rating_comment, ts.reviewed_at " +
-                 "FROM tasks t " +
-                 "JOIN task_submissions ts ON t.id = ts.task_id " +
-                 "WHERE ts.worker_id = ? AND t.status = 'completed' AND ts.status = 'approved' " +
-                 "ORDER BY ts.reviewed_at DESC";
-    try (Connection conn = DBConnection.getConnection();
-         PreparedStatement pstmt = conn.prepareStatement(sql)) {
-        pstmt.setInt(1, workerId);
-        ResultSet rs = pstmt.executeQuery();
-        while (rs.next()) {
-            Map<String, Object> record = new HashMap<>();
-            record.put("title", rs.getString("title"));
-            record.put("wage", rs.getDouble("wage"));
-            record.put("rating", rs.getInt("rating"));
-            record.put("comment", rs.getString("rating_comment"));
-            record.put("date", rs.getTimestamp("reviewed_at"));
-            performance.add(record);
+    public List<Map<String, Object>> getCompletedTasksWithRatings(int workerId, String sortBy, String sortDir, String search) {
+        List<Map<String, Object>> performance = new ArrayList<>();
+        
+        Map<String, String> allowedCols = new HashMap<>();
+        allowedCols.put("title", "t.title");
+        allowedCols.put("date", "ts.reviewed_at");
+        allowedCols.put("wage", "t.wage");
+        allowedCols.put("rating", "ts.rating");
+        
+        String orderBy = allowedCols.getOrDefault(sortBy, "ts.reviewed_at");
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        
+        StringBuilder sql = new StringBuilder("SELECT t.title, t.wage, t.status as task_status, ts.rating, ts.rating_comment, ts.reviewed_at " +
+                     "FROM tasks t " +
+                     "JOIN task_submissions ts ON t.id = ts.task_id " +
+                     "WHERE ts.worker_id = ? AND t.status = 'completed' AND ts.status = 'approved'");
+        
+        if (search != null && !search.trim().isEmpty()) {
+            sql.append(" AND t.title LIKE ?");
         }
-    } catch (SQLException e) {
-        e.printStackTrace();
+        
+        sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
+        
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            
+            pstmt.setInt(1, workerId);
+            if (search != null && !search.trim().isEmpty()) {
+                pstmt.setString(2, "%" + search.trim() + "%");
+            }
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> record = new HashMap<>();
+                    record.put("title", rs.getString("title"));
+                    record.put("wage", rs.getDouble("wage"));
+                    record.put("rating", rs.getInt("rating"));
+                    record.put("comment", rs.getString("rating_comment"));
+                    record.put("date", rs.getTimestamp("reviewed_at") != null ? rs.getTimestamp("reviewed_at").toString() : "");
+                    performance.add(record);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return performance;
     }
-    return performance;
+
+    public List<Map<String, Object>> getCompletedTasksWithRatings(int workerId, String sortBy, String sortDir) {
+        return getCompletedTasksWithRatings(workerId, sortBy, sortDir, null);
+    }
+
+    public List<Map<String, Object>> getCompletedTasksWithRatings(int workerId) {
+        return getCompletedTasksWithRatings(workerId, "date", "DESC");
     }
     }

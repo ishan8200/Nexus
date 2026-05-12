@@ -24,7 +24,7 @@
     Integer lateSubmissions = (Integer) request.getAttribute("lateSubmissions");
     
     // Formatter for currency
-    java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(Locale.US);
+    java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(new Locale("en", "NP"));
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,8 +35,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
     <script src="${pageContext.request.contextPath}/js/alert.js"></script>
+    <script src="${pageContext.request.contextPath}/js/dashboard-utils.js"></script>
     <style>
         /* Custom overrides for dashboard specific elements */
         .admin-main {
@@ -146,11 +148,12 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <span class="logo-mark">⌘</span>
-                <span class="logo-text">NEXUS</span>
+                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
                 <a href="#" class="active">Dashboard</a>
                 <a href="${pageContext.request.contextPath}/logout" class="btn-login-nav">Logout</a>
             </div>
@@ -164,7 +167,13 @@
             <div class="sidebar-header">
                 <h3>Navigation</h3>
                 <div class="admin-profile">
-                    <div class="admin-avatar"><%= currentUser.getFullName().substring(0, 1).toUpperCase() %></div>
+                    <div class="admin-avatar" id="sidebarAvatar">
+                        <% if (currentUser.getProfilePic() != null && !currentUser.getProfilePic().isEmpty()) { %>
+                            <img src="${pageContext.request.contextPath}/images/<%= currentUser.getProfilePic() %>" alt="Avatar" style="width: 100%; height: 100%; border-radius: var(--radius-lg); object-fit: cover;">
+                        <% } else { %>
+                            <%= currentUser.getFullName().substring(0, 1).toUpperCase() %>
+                        <% } %>
+                    </div>
                     <div class="admin-info">
                         <h4><%= currentUser.getFullName() %></h4>
                         <p><%= currentUser.getRole().substring(0, 1).toUpperCase() + currentUser.getRole().substring(1) %></p>
@@ -175,11 +184,11 @@
             <nav class="sidebar-nav">
                 <div class="nav-section-title">MAIN</div>
                 <a href="javascript:void(0)" class="nav-item active" onclick="switchToPage('dashboard')">
-                    <span class="nav-icon">📊</span>
+                    <span class="nav-icon"><i class="fas fa-th-large"></i></span>
                     <span class="nav-text">Dashboard</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('notifications')">
-                    <span class="nav-icon">🔔</span>
+                    <span class="nav-icon"><i class="fas fa-bell"></i></span>
                     <span class="nav-text">Notifications</span>
                     <% 
                         List<Map<String, Object>> notifs = (List<Map<String, Object>>) request.getAttribute("notifications");
@@ -190,34 +199,34 @@
                     <% } %>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('available-tasks')">
-                    <span class="nav-icon">🔍</span>
+                    <span class="nav-icon"><i class="fas fa-search-plus"></i></span>
                     <span class="nav-text">Available Tasks</span>
                     <span class="nav-badge"><%= availableTasks != null ? availableTasks.size() : 0 %></span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-tasks')">
-                    <span class="nav-icon">📋</span>
+                    <span class="nav-icon"><i class="fas fa-tasks"></i></span>
                     <span class="nav-text">My Tasks</span>
                     <span class="nav-badge"><%= myTasks != null ? myTasks.size() : 0 %></span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-performance')">
-                    <span class="nav-icon">📈</span>
+                    <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
                     <span class="nav-text">My Performance</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('my-skills')">
-                    <span class="nav-icon">🛠️</span>
+                    <span class="nav-icon"><i class="fas fa-tools"></i></span>
                     <span class="nav-text">My Skills</span>
                     <span class="nav-badge"><%= workerSkills != null ? workerSkills.size() : 0 %></span>
                 </a>
                 
                 <div class="nav-section-title">FINANCES</div>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('earnings')">
-                    <span class="nav-icon">💰</span>
+                    <span class="nav-icon"><i class="fas fa-wallet"></i></span>
                     <span class="nav-text">Earnings History</span>
                 </a>
                 
                 <div class="nav-section-title">ACCOUNT</div>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('profile')">
-                    <span class="nav-icon">👤</span>
+                    <span class="nav-icon"><i class="fas fa-user-circle"></i></span>
                     <span class="nav-text">My Profile</span>
                 </a>
             </nav>
@@ -241,7 +250,7 @@
                 <div class="worker-stats-grid">
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
-                            <span class="worker-stat-icon">💰</span>
+                            <span class="worker-stat-icon"><i class="fas fa-hand-holding-usd" style="color: var(--nexus-success);"></i></span>
                             <span class="worker-stat-label">Total Earned</span>
                         </div>
                         <div class="worker-stat-value"><%= cur.format(totalEarned != null ? totalEarned : 0) %></div>
@@ -249,7 +258,7 @@
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
-                            <span class="worker-stat-icon">✅</span>
+                            <span class="worker-stat-icon"><i class="fas fa-check-circle" style="color: var(--nexus-accent);"></i></span>
                             <span class="worker-stat-label">Tasks Done</span>
                         </div>
                         <div class="worker-stat-value"><%= tasksCompleted != null ? tasksCompleted : 0 %></div>
@@ -257,7 +266,7 @@
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
-                            <span class="worker-stat-icon">⭐</span>
+                            <span class="worker-stat-icon"><i class="fas fa-star" style="color: var(--nexus-warning);"></i></span>
                             <span class="worker-stat-label">Rating</span>
                         </div>
                         <div class="worker-stat-value"><%= avgRating != null ? String.format("%.1f", avgRating) : "0.0" %></div>
@@ -265,7 +274,7 @@
                     </div>
                     <div class="worker-stat-card">
                         <div class="worker-stat-header">
-                            <span class="worker-stat-icon">⏳</span>
+                            <span class="worker-stat-icon"><i class="fas fa-clock" style="color: var(--nexus-warning);"></i></span>
                             <span class="worker-stat-label">Pending</span>
                         </div>
                         <div class="worker-stat-value"><%= cur.format(pendingPayment != null ? pendingPayment : 0) %></div>
@@ -276,22 +285,22 @@
                 <!-- Quick Actions -->
                 <div class="quick-actions" style="margin: var(--space-lg) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md);">
                     <div class="quick-action-card" onclick="switchToPage('available-tasks')">
-                        <div class="quick-action-icon">🔍</div>
+                        <div class="quick-action-icon"><i class="fas fa-search"></i></div>
                         <div class="quick-action-title">Find New Tasks</div>
                         <div class="quick-action-desc">Browse available work</div>
                     </div>
                     <div class="quick-action-card" onclick="switchToPage('my-tasks')">
-                        <div class="quick-action-icon">📋</div>
+                        <div class="quick-action-icon"><i class="fas fa-list-check"></i></div>
                         <div class="quick-action-title">My Active Tasks</div>
                         <div class="quick-action-desc">Continue working</div>
                     </div>
                     <div class="quick-action-card" onclick="switchToPage('earnings')">
-                        <div class="quick-action-icon">💰</div>
+                        <div class="quick-action-icon"><i class="fas fa-money-bill-transfer"></i></div>
                         <div class="quick-action-title">View Earnings</div>
                         <div class="quick-action-desc">Track your income</div>
                     </div>
                     <div class="quick-action-card" onclick="switchToPage('my-performance')">
-                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-icon"><i class="fas fa-gauge-high"></i></div>
                         <div class="quick-action-title">Performance</div>
                         <div class="quick-action-desc">See your stats</div>
                     </div>
@@ -300,7 +309,7 @@
                 <div class="dashboard-grid">
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3>📌 Active Deliverables</h3>
+                            <h3><i class="fas fa-thumbtack" style="color: var(--nexus-accent); margin-right: 8px;"></i>Active Deliverables</h3>
                             <button class="btn-icon" onclick="switchToPage('my-tasks')">View All →</button>
                         </div>
                         <div class="admin-card-body">
@@ -330,7 +339,7 @@
 
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3>📊 Performance Summary</h3>
+                            <h3><i class="fas fa-chart-pie" style="color: var(--nexus-accent); margin-right: 8px;"></i>Performance Summary</h3>
                             <button class="btn-icon" onclick="switchToPage('my-performance')">Details →</button>
                         </div>
                         <div class="admin-card-body">
@@ -357,7 +366,7 @@
 
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3>📜 Recent Activity</h3>
+                            <h3><i class="fas fa-history" style="color: var(--nexus-accent); margin-right: 8px;"></i>Recent Activity</h3>
                         </div>
                         <div class="admin-card-body">
                             <% if (earningsHistory != null && !earningsHistory.isEmpty()) { %>
@@ -365,7 +374,7 @@
                                     Map<String, Object> entry = earningsHistory.get(i);
                                 %>
                                 <div style="padding: 12px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px; align-items: center;">
-                                    <div style="font-size: 20px;">💰</div>
+                                    <div style="font-size: 18px; color: var(--nexus-success);"><i class="fas fa-hand-holding-usd"></i></div>
                                     <div style="flex: 1;">
                                         <h4 style="font-weight: 600; font-size: 14px;">Earned in <%= entry.get("month") %></h4>
                                         <p style="font-size: 11px; color: var(--text-muted);"><%= entry.get("task_count") %> tasks finalized</p>
@@ -387,7 +396,26 @@
 
             <!-- Available Tasks View -->
             <div id="available-tasksView" class="page-section">
-                <div class="grid-2">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem;">
+                    <div class="search-group" style="flex: 1; max-width: none;">
+                        <div class="search-wrapper">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="availableTaskSearch" class="search-input" placeholder="Search tasks by title, description or priority..." value="${availSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('availSearch', this.value)">
+                        </div>
+                        <button class="search-action-btn" onclick="serverSideSearch('availSearch', document.getElementById('availableTaskSearch').value)">Search</button>
+                    </div>
+                    <div class="sort-container" style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 14px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">Sort by:</label>
+                        <select class="select-field" style="width: 150px; padding: 8px;" onchange="const val = this.value.split(':'); serverSideSearch('availSortBy', val[0]); serverSideSearch('availSortDir', val[1]);">
+                            <option value="deadline:ASC" ${availSortBy == 'deadline' && availSortDir == 'ASC' ? 'selected' : ''}>Deadline (Soonest)</option>
+                            <option value="deadline:DESC" ${availSortBy == 'deadline' && availSortDir == 'DESC' ? 'selected' : ''}>Deadline (Latest)</option>
+                            <option value="wage:DESC" ${availSortBy == 'wage' && availSortDir == 'DESC' ? 'selected' : ''}>Wage (High to Low)</option>
+                            <option value="wage:ASC" ${availSortBy == 'wage' && availSortDir == 'ASC' ? 'selected' : ''}>Wage (Low to High)</option>
+                            <option value="title:ASC" ${availSortBy == 'title' && availSortDir == 'ASC' ? 'selected' : ''}>Title (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid-2" id="availableTasksGrid">
                     <% if (availableTasks != null && !availableTasks.isEmpty()) { %>
                         <% for (Map<String, Object> task : availableTasks) { %>
                             <div class="task-card-improved">
@@ -409,7 +437,7 @@
                                 </p>
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid var(--nexus-border);">
                                     <div style="font-size: 12px; color: var(--text-muted);">
-                                        📅 Deadline: <%= task.get("deadline") %>
+                                        <i class="fas fa-calendar-alt"></i> Deadline: <%= task.get("deadline") %>
                                     </div>
                                     <button onclick="acceptTask(<%= task.get("id") %>, this)" class="btn btn-primary" style="padding: 8px 16px;">Accept Task →</button>
                                 </div>
@@ -428,16 +456,25 @@
             <div id="my-tasksView" class="page-section">
                 <div class="admin-card">
                     <div class="admin-card-header">
-                        <h3>📋 Assigned Deliverables</h3>
+                        <h3>Assigned Deliverables</h3>
+                    </div>
+                    <div class="search-container">
+                        <div class="search-group">
+                            <div class="search-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="myTaskSearch" class="search-input" placeholder="Search my tasks..." value="${mySearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('mySearch', this.value)">
+                            </div>
+                            <button class="search-action-btn" onclick="serverSideSearch('mySearch', document.getElementById('myTaskSearch').value)">Search</button>
+                        </div>
                     </div>
                     <div class="admin-card-body" style="padding: 0;">
-                        <table class="admin-table">
+                        <table class="admin-table" id="myTasksTable">
                             <thead>
                                 <tr>
-                                    <th>Task Title</th>
-                                    <th>Deadline</th>
-                                    <th>Wage</th>
-                                    <th>Status</th>
+                                    <th class="sortable ${mySortBy == 'title' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'title', 'mySortDir')">Task Title</th>
+                                    <th class="sortable ${mySortBy == 'deadline' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'deadline', 'mySortDir')">Deadline</th>
+                                    <th class="sortable ${mySortBy == 'wage' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'wage', 'mySortDir')">Wage</th>
+                                    <th class="sortable ${mySortBy == 'status' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'status', 'mySortDir')">Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -509,14 +546,23 @@
                     <div class="admin-card-header">
                         <h3>📈 Task Performance & Ratings</h3>
                     </div>
+                    <div class="search-container">
+                        <div class="search-group">
+                            <div class="search-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="perfSearch" class="search-input" placeholder="Search performance history..." value="${perfSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('perfSearch', this.value)">
+                            </div>
+                            <button class="search-action-btn" onclick="serverSideSearch('perfSearch', document.getElementById('perfSearch').value)">Search</button>
+                        </div>
+                    </div>
                     <div class="admin-card-body" style="padding: 0;">
-                        <table class="admin-table">
+                        <table class="admin-table" id="perfTable">
                             <thead>
                                 <tr>
-                                    <th>Task Title</th>
-                                    <th>Completion Date</th>
-                                    <th>Wage Earned</th>
-                                    <th>Rating</th>
+                                    <th class="sortable ${perfSortBy == 'title' ? (perfSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('perfSortBy', 'title', 'perfSortDir')">Task Title</th>
+                                    <th class="sortable ${perfSortBy == 'date' ? (perfSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('perfSortBy', 'date', 'perfSortDir')">Completion Date</th>
+                                    <th class="sortable ${perfSortBy == 'wage' ? (perfSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('perfSortBy', 'wage', 'perfSortDir')">Wage Earned</th>
+                                    <th class="sortable ${perfSortBy == 'rating' ? (perfSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('perfSortBy', 'rating', 'perfSortDir')">Rating</th>
                                     <th>Feedback</th>
                                 </tr>
                             </thead>
@@ -635,7 +681,15 @@
             <div id="earningsView" class="page-section">
                 <div class="admin-card">
                     <div class="admin-card-header">
-                        <h3>💰 Monthly Earnings Summary</h3>
+                        <h3><i class="fas fa-wallet" style="color: var(--nexus-accent); margin-right: 8px;"></i>Monthly Earnings Summary</h3>
+                    </div>                    <div class="search-container">
+                        <div class="search-group">
+                            <div class="search-wrapper">
+                                <span class="search-icon">🔍</span>
+                                <input type="text" id="earningsSearch" class="search-input" placeholder="Search earnings history..." onkeyup="searchTable('earningsSearch', 'earningsTable')">
+                            </div>
+                            <button class="search-action-btn" onclick="searchTable('earningsSearch', 'earningsTable')">Search</button>
+                        </div>
                     </div>
                     <div class="admin-card-body">
                         <% if (earningsHistory != null && !earningsHistory.isEmpty()) { %>
@@ -646,12 +700,12 @@
                                     <div class="metric-value"><%= cur.format(latest.get("total_amount")) %></div>
                                 </div>
                             </div>
-                            <table class="admin-table">
+                            <table class="admin-table" id="earningsTable">
                                 <thead>
                                     <tr>
-                                        <th>Period (Month)</th>
-                                        <th>Tasks Completed</th>
-                                        <th>Total Amount</th>
+                                        <th class="sortable ${earnSortBy == 'period' ? (earnSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('earnSortBy', 'period', 'earnSortDir')">Period (Month)</th>
+                                        <th class="sortable ${earnSortBy == 'tasks' ? (earnSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('earnSortBy', 'tasks', 'earnSortDir')">Tasks Completed</th>
+                                        <th class="sortable ${earnSortBy == 'amount' ? (earnSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('earnSortBy', 'amount', 'earnSortDir')">Total Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -682,7 +736,32 @@
                         <h3>👤 My Professional Profile</h3>
                     </div>
                     <div class="admin-card-body">
-                        <div class="form-row">
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <div class="admin-avatar" id="settingsAvatar" style="width: 100px; height: 100px; margin: 0 auto 15px; font-size: 2.5rem;">
+                                <% if (currentUser.getProfilePic() != null && !currentUser.getProfilePic().isEmpty()) { %>
+                                    <img src="${pageContext.request.contextPath}/images/<%= currentUser.getProfilePic() %>" alt="Avatar" style="width: 100%; height: 100%; border-radius: var(--radius-lg); object-fit: cover;">
+                                <% } else { %>
+                                    <%= currentUser.getFullName().substring(0, 1).toUpperCase() %>
+                                <% } %>
+                            </div>
+                            <h4>Manage Profile Picture</h4>
+                            <p class="text-muted" style="font-size: 13px;">Select an image from the operational repository</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Upload Profile Image</label>
+                            <div style="margin-top: 10px; padding: 20px; background: var(--nexus-surface); border-radius: var(--radius-md); border: 1px solid var(--nexus-border); display: flex; flex-direction: column; gap: 15px;">
+                                <div style="display: flex; align-items: center; gap: 15px;">
+                                    <div style="flex: 1;">
+                                        <input type="file" id="profilePicInput" accept="image/*" class="input-field" style="padding: 8px;">
+                                        <p class="text-muted" style="font-size: 11px; margin-top: 5px;">Supported formats: JPG, PNG, WEBP (Max 10MB)</p>
+                                    </div>
+                                    <button onclick="uploadProfilePic()" class="btn btn-primary">Upload & Apply</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-row" style="margin-top: 25px;">
                             <div class="form-group">
                                 <label class="form-label">Full Name</label>
                                 <input type="text" class="input-field" value="<%= currentUser.getFullName() %>" readonly>
@@ -736,8 +815,14 @@
                         <% if (notifs != null && !notifs.isEmpty()) { %>
                             <% for (Map<String, Object> n : notifs) { %>
                                 <div class="notification-item" style="padding: 15px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px; background: <%= (boolean)n.get("is_read") ? "transparent" : "rgba(59, 130, 246, 0.03)" %>;">
-                                    <div class="notification-icon" style="font-size: 20px;">
-                                        <%= "success".equals(n.get("type")) ? "✅" : ("warning".equals(n.get("type")) ? "⚠️" : "ℹ️") %>
+                                    <div class="notification-icon" style="font-size: 18px;">
+                                        <% if ("success".equals(n.get("type"))) { %>
+                                            <i class="fas fa-check-circle" style="color: var(--nexus-success);"></i>
+                                        <% } else if ("warning".equals(n.get("type"))) { %>
+                                            <i class="fas fa-exclamation-triangle" style="color: var(--nexus-warning);"></i>
+                                        <% } else { %>
+                                            <i class="fas fa-info-circle" style="color: var(--nexus-accent);"></i>
+                                        <% } %>
                                     </div>
                                     <div style="flex: 1;">
                                         <div style="display: flex; justify-content: space-between;">
@@ -762,26 +847,57 @@
     <!-- Submission Modal -->
     <div id="submitModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
         <div class="modal-content" style="background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
-            <h2 id="modalTaskTitle" style="margin-bottom: 20px;">Submit Work</h2>
-            <form action="${pageContext.request.contextPath}/submit-task" method="POST">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 id="modalTaskTitle" style="margin: 0;">Submit Work</h2>
+                <button id="restoreDraftBtn" onclick="restoreDraft()" class="btn btn-outline" style="display: none; padding: 4px 10px; font-size: 11px; border-color: var(--nexus-accent); color: var(--nexus-accent);">⚡ Resume Draft</button>
+            </div>
+            <form action="${pageContext.request.contextPath}/submit-task" method="POST" enctype="multipart/form-data">
                 <input type="hidden" id="modalAssignmentId" name="assignmentId">
                 <div class="form-group">
                     <label class="form-label">Submission Details / Proof of Work</label>
-                    <textarea name="submissionText" class="textarea-field" required placeholder="Describe what you've completed..." style="height: 120px;"></textarea>
+                    <textarea id="modalSubmissionText" name="submissionText" class="textarea-field" required placeholder="Describe what you've completed..." style="height: 120px;" oninput="saveDraft()"></textarea>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label class="form-label">Attach Files (Optional)</label>
+                    <div style="position: relative;">
+                        <input type="file" name="attachment" id="modalAttachment" class="input-field" style="padding: 8px;" onchange="updateFileName(this)" multiple>
+                        <div id="fileSelectedName" style="font-size: 11px; color: var(--nexus-accent); margin-top: 4px; font-weight: 600;"></div>
+                    </div>
+                    <p class="text-muted" style="font-size: 11px; margin-top: 5px;">Supported: PDF, ZIP, Images (Max 50MB per file)</p>
                 </div>
                 <div class="form-group" style="margin-top: 15px;">
                     <label class="form-label">Hours Worked</label>
-                    <input type="number" name="hoursWorked" step="0.5" min="0" class="input-field" placeholder="e.g. 2.5">
+                    <input type="number" id="modalHoursWorked" name="hoursWorked" step="0.5" min="0" class="input-field" placeholder="e.g. 2.5" oninput="saveDraft()">
                 </div>
                 <div style="display: flex; gap: 10px; margin-top: 25px;">
                     <button type="button" onclick="closeSubmitModal()" class="btn btn-secondary" style="flex: 1;">Cancel</button>
-                    <button type="submit" class="btn btn-primary" style="flex: 1;">Submit Deliverable</button>
+                    <button type="submit" id="submitBtn" class="btn btn-primary" style="flex: 1;">Submit Deliverable</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
+        function updateFileName(input) {
+            const fileNameDiv = document.getElementById('fileSelectedName');
+            if (input.files && input.files.length > 0) {
+                if (input.files.length === 1) {
+                    fileNameDiv.textContent = '📎 Selected: ' + input.files[0].name;
+                } else {
+                    fileNameDiv.textContent = '📎 ' + input.files.length + ' files selected';
+                    // Optional: show first few names
+                    let names = [];
+                    for (let i = 0; i < Math.min(input.files.length, 3); i++) {
+                        names.push(input.files[i].name);
+                    }
+                    if (input.files.length > 3) names.push('...');
+                    fileNameDiv.title = Array.from(input.files).map(f => f.name).join(', ');
+                }
+            } else {
+                fileNameDiv.textContent = '';
+            }
+        }
+
         function switchToPage(pageId) {
             // Hide all sections
             document.querySelectorAll('.page-section').forEach(section => {
@@ -834,6 +950,36 @@
             document.getElementById('pageSubtitle').textContent = subtitles[pageId] || 'Operational Node';
         }
         
+        function saveDraft() {
+            const assignmentId = document.getElementById('modalAssignmentId').value;
+            const text = document.getElementById('modalSubmissionText').value;
+            const hours = document.getElementById('modalHoursWorked').value;
+            
+            if (assignmentId) {
+                const draft = { text, hours, timestamp: new Date().getTime() };
+                localStorage.setItem('submission_draft_' + assignmentId, JSON.stringify(draft));
+            }
+        }
+
+        function restoreDraft() {
+            const assignmentId = document.getElementById('modalAssignmentId').value;
+            const draftJson = localStorage.getItem('submission_draft_' + assignmentId);
+            if (draftJson) {
+                const draft = JSON.parse(draftJson);
+                document.getElementById('modalSubmissionText').value = draft.text;
+                document.getElementById('modalHoursWorked').value = draft.hours;
+                document.getElementById('restoreDraftBtn').style.display = 'none';
+                showAlert('alertContainer', 'Draft restored successfully!', 'success');
+            }
+        }
+
+        function clearDraft() {
+            const assignmentId = document.getElementById('modalAssignmentId').value;
+            if (assignmentId) {
+                localStorage.removeItem('submission_draft_' + assignmentId);
+            }
+        }
+
        function openSubmitModal(assignmentId, taskTitle) {
             try {
                 console.log('openSubmitModal called with:', { assignmentId, taskTitle });
@@ -850,6 +996,21 @@
                 
                 assignmentIdInput.value = assignmentId;
                 taskTitleElem.textContent = 'Submit Work: ' + taskTitle;
+                
+                // Check for draft
+                const draft = localStorage.getItem('submission_draft_' + assignmentId);
+                const restoreBtn = document.getElementById('restoreDraftBtn');
+                if (draft && restoreBtn) {
+                    restoreBtn.style.display = 'block';
+                } else if (restoreBtn) {
+                    restoreBtn.style.display = 'none';
+                }
+                
+                // Clear fields if no draft or starting fresh
+                if (!draft) {
+                    document.getElementById('modalSubmissionText').value = '';
+                    document.getElementById('modalHoursWorked').value = '';
+                }
                 
                 modal.style.display = 'flex';
                 // Small delay to allow display: flex to take effect before adding the active class for transition
@@ -978,15 +1139,102 @@
             });
         }
 
+        function uploadProfilePic() {
+            const fileInput = document.getElementById('profilePicInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showAlert('alertContainer', 'Please select a file to upload.', 'error');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) {
+                showAlert('alertContainer', 'File is too large. Maximum size is 10MB.', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('action', 'uploadPicture');
+            formData.append('profilePicFile', file);
+            
+            fetch('${pageContext.request.contextPath}/update-profile', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showAlert('alertContainer', result.message, 'success');
+                      // Update avatars on the page
+                      const avatarUrl = '${pageContext.request.contextPath}/images/' + result.profilePic;
+                      const avatarHtml = `<img src="\${avatarUrl}" alt="Avatar" style="width: 100%; height: 100%; border-radius: var(--radius-lg); object-fit: cover;">`;
+                      
+                      document.getElementById('sidebarAvatar').innerHTML = avatarHtml;
+                      document.getElementById('settingsAvatar').innerHTML = avatarHtml;
+                      
+                      // Clear input
+                      fileInput.value = '';
+                  } else {
+                      showAlert('alertContainer', result.message, 'error');
+                  }
+              }).catch(err => {
+                  console.error('Error:', err);
+                  showAlert('alertContainer', 'An error occurred during upload.', 'error');
+              });
+        }
+
+        function selectProfilePic(fileName) {
+            if (!confirm('Update profile picture to ' + fileName + '?')) return;
+            
+            fetch('${pageContext.request.contextPath}/update-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=updatePicture&profilePic=' + encodeURIComponent(fileName)
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showAlert('alertContainer', result.message, 'success');
+                      // Update avatars on the page
+                      const avatarUrl = '${pageContext.request.contextPath}/images/' + fileName;
+                      const avatarHtml = `<img src="\${avatarUrl}" alt="Avatar" style="width: 100%; height: 100%; border-radius: var(--radius-lg); object-fit: cover;">`;
+                      
+                      document.getElementById('sidebarAvatar').innerHTML = avatarHtml;
+                      document.getElementById('settingsAvatar').innerHTML = avatarHtml;
+                      
+                      // Update active state in selector
+                      document.querySelectorAll('.image-option').forEach(opt => {
+                          opt.classList.remove('active');
+                          opt.style.borderColor = 'transparent';
+                          const check = opt.querySelector('div');
+                          if (check) check.remove();
+                      });
+                      
+                      // Find the selected option and mark it
+                      const options = document.querySelectorAll('.image-option');
+                      for (const opt of options) {
+                          if (opt.getAttribute('onclick').includes(fileName)) {
+                              opt.classList.add('active');
+                              opt.style.borderColor = 'var(--nexus-accent)';
+                              const check = document.createElement('div');
+                              check.style = "position: absolute; bottom: 2px; right: 2px; background: var(--nexus-accent); color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px;";
+                              check.textContent = '✓';
+                              opt.appendChild(check);
+                              break;
+                          }
+                      }
+                  } else {
+                      showAlert('alertContainer', result.message, 'error');
+                  }
+              }).catch(err => showAlert('alertContainer', 'Network error', 'error'));
+        }
+
         // Make sure form submission is handled
         document.querySelector('#submitModal form')?.addEventListener('submit', function(e) {
             e.preventDefault();
-            const formData = new URLSearchParams(new FormData(this));
+            const formData = new FormData(this);
             
             fetch(this.action, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString()
+                body: formData
             }).then(response => {
                 if (response.redirected) {
                     const url = new URL(response.url);

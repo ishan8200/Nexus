@@ -7,21 +7,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register | Nexus Works</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/css/styles.css">
     <script src="${pageContext.request.contextPath}/js/alert.js"></script>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-container">
-            <a href="#" class="logo">
-                <span class="logo-mark">⌘</span>
-                <span class="logo-text">NEXUS</span>
+            <a href="${pageContext.request.contextPath}/" class="logo">
+                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
-                <a href="#">Home</a>
-                <a href="#">Platform</a>
-                <a href="#">Documentation</a>
-                <a href="#" class="btn-login-nav">Login</a>
+                <a href="${pageContext.request.contextPath}/">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
+                <a href="${pageContext.request.contextPath}/login" class="btn-login-nav">Login</a>
             </div>
         </div>
     </nav>
@@ -30,7 +30,7 @@
         <div class="register-container">
             <div class="brand-section">
                 <div class="brand-icon">
-                    ⌘
+                    <i class="fas fa-microchip"></i>
                 </div>
                 <h1>Create your account</h1>
                 <p>Join Nexus Works as an Admin or Worker</p>
@@ -44,7 +44,7 @@
                         <div class="form-group">
                             <label class="form-label">Full Name *</label>
                             <div class="input-container">
-                                <span class="input-icon">👤</span>
+                                <span class="input-icon"><i class="fas fa-user"></i></span>
                                 <input type="text" class="input-field" id="fullName" name="fullName" placeholder="Ishan Maharjan" required>
                             </div>
                         </div>
@@ -78,9 +78,9 @@
                         <div class="form-group">
                             <label class="form-label">Password *</label>
                             <div class="input-container">
-                                <span class="input-icon">🔒</span>
+                                <span class="input-icon"><i class="fas fa-lock"></i></span>
                                 <input type="password" class="input-field" id="password" name="password" placeholder="At least 6 characters" required>
-                                <button type="button" class="password-toggle" id="togglePassword">👁️</button>
+                                <button type="button" class="password-toggle" id="togglePassword"><i class="fas fa-eye"></i></button>
                             </div>
                             <small class="form-hint">Minimum 6 characters with at least one number</small>
                         </div>
@@ -88,9 +88,9 @@
                         <div class="form-group">
                             <label class="form-label">Confirm Password *</label>
                             <div class="input-container">
-                                <span class="input-icon">✓</span>
+                                <span class="input-icon"><i class="fas fa-check"></i></span>
                                 <input type="password" class="input-field" id="confirmPassword" name="confirmPassword" placeholder="Retype password" required>
-                                <button type="button" class="password-toggle" id="toggleConfirmPassword">👁️</button>
+                                <button type="button" class="password-toggle" id="toggleConfirmPassword"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
                     </div>
@@ -101,7 +101,7 @@
                             <label class="role-card">
                                 <input type="radio" name="role" value="admin" required>
                                 <div class="role-content">
-                                    <span class="role-icon">🏢</span>
+                                    <span class="role-icon"><i class="fas fa-building-user"></i></span>
                                     <span class="role-title">Admin</span>
                                     <span class="role-desc">Post tasks, manage workers, track progress</span>
                                 </div>
@@ -109,7 +109,7 @@
                             <label class="role-card">
                                 <input type="radio" name="role" value="worker" required>
                                 <div class="role-content">
-                                    <span class="role-icon">👷</span>
+                                    <span class="role-icon"><i class="fas fa-users-gear"></i></span>
                                     <span class="role-title">Worker</span>
                                     <span class="role-desc">Find tasks, submit work, earn wages</span>
                                 </div>
