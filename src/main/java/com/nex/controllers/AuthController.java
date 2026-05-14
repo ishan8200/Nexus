@@ -3,6 +3,7 @@ package com.nex.controllers;
 import java.io.IOException;
 
 import com.nex.dao.UserDAO;
+import com.nex.dao.SettingsDAO;
 import com.nex.model.User;
 
 import jakarta.servlet.ServletException;
@@ -13,16 +14,18 @@ import jakarta.servlet.http.*;
  * AuthController handles all authentication-related requests: Login, Registration, and Logout.
  * This satisfies the "Two Controllers" requirement.
  */
-@WebServlet({"/login", "/register", "/logout"})
+@WebServlet({"/login", "/register", "/logout", "/forgot-password"})
 public class AuthController extends HttpServlet {
     
     private static final long serialVersionUID = 1L;
     private UserDAO userDao;
+    private SettingsDAO settingsDao;
 
     @Override
     public void init() throws ServletException {
         super.init();
         userDao = new UserDAO();
+        settingsDao = new SettingsDAO();
     }
 
     @Override
@@ -30,6 +33,9 @@ public class AuthController extends HttpServlet {
             throws ServletException, IOException {
         
         String path = request.getServletPath();
+        
+        // Fetch site settings for branding/logo
+        request.setAttribute("siteSettings", settingsDao.getAllSettings());
         
         // Routing based on servlet path
         if (path.equals("/login")) {
@@ -64,6 +70,8 @@ public class AuthController extends HttpServlet {
             handleLogin(request, response);
         } else if (path.equals("/register")) {
             handleRegister(request, response);
+        } else if (path.equals("/forgot-password")) {
+            handleForgotPassword(request, response);
         }
     }
 
@@ -103,16 +111,16 @@ public class AuthController extends HttpServlet {
         User user = userDao.loginUser(email, password);
         
         if (user != null) {
-            // Check if worker is approved
-            if ("worker".equals(user.getRole()) && !"approved".equals(user.getStatus())) {
-                request.setAttribute("error", "Your account is pending admin approval. Please wait.");
+            // Check if user is blocked
+            if ("blocked".equals(user.getStatus())) {
+                request.setAttribute("error", "Your account has been blocked due to multiple failed login attempts. Please reset your password to unblock.");
                 request.getRequestDispatcher("/WEB-INF/pages/login.jsp").forward(request, response);
                 return;
             }
-            
-            // Check if user is blocked
-            if ("blocked".equals(user.getStatus())) {
-                request.setAttribute("error", "Your account has been blocked. Please contact support.");
+
+            // Check if worker is approved
+            if ("worker".equals(user.getRole()) && !"approved".equals(user.getStatus())) {
+                request.setAttribute("error", "Your account is pending admin approval. Please wait.");
                 request.getRequestDispatcher("/WEB-INF/pages/login.jsp").forward(request, response);
                 return;
             }
@@ -141,8 +149,57 @@ public class AuthController extends HttpServlet {
                 response.sendRedirect(request.getContextPath() + "/worker");
             }
         } else {
-            request.setAttribute("error", "Invalid email or password");
+            // Failed login - increment attempts
+            int attempts = userDao.incrementFailedAttempts(email);
+            String errorMsg = "Invalid email or password.";
+            if (attempts > 0) {
+                if (attempts >= 5) {
+                    errorMsg = "Your account has been blocked due to 5 failed attempts. Please reset your password.";
+                } else {
+                    errorMsg += " Remaining attempts: " + (5 - attempts);
+                }
+            }
+            request.setAttribute("error", errorMsg);
             request.getRequestDispatcher("/WEB-INF/pages/login.jsp").forward(request, response);
+        }
+    }
+
+    /**
+     * Handle password reset via Forgot Password modal
+     */
+    private void handleForgotPassword(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        String email = request.getParameter("email");
+        String password = request.getParameter("newPassword");
+        String confirmPassword = request.getParameter("confirmPassword");
+        
+        if (email == null || email.trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Email is required", "UTF-8"));
+            return;
+        }
+        
+        if (!userDao.isEmailExists(email)) {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Email not found", "UTF-8"));
+            return;
+        }
+        
+        if (password == null || password.length() < 6) {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Password must be at least 6 characters", "UTF-8"));
+            return;
+        }
+        
+        if (!password.equals(confirmPassword)) {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Passwords do not match", "UTF-8"));
+            return;
+        }
+        
+        boolean isReset = userDao.resetPassword(email, password);
+        
+        if (isReset) {
+            response.sendRedirect(request.getContextPath() + "/login?success=" + java.net.URLEncoder.encode("Password reset successful! You can now log in.", "UTF-8"));
+        } else {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Failed to reset password. Please try again.", "UTF-8"));
         }
     }
 
@@ -152,6 +209,13 @@ public class AuthController extends HttpServlet {
     private void handleRegister(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
         
+        // Check if registration is enabled
+        String regEnabled = settingsDao.getSetting("registration_enabled", "true");
+        if (!"true".equalsIgnoreCase(regEnabled)) {
+            response.sendRedirect(request.getContextPath() + "/login?error=" + java.net.URLEncoder.encode("Registrations are disabled", "UTF-8"));
+            return;
+        }
+
         String username = request.getParameter("username");
         String email = request.getParameter("email");
         String password = request.getParameter("password");

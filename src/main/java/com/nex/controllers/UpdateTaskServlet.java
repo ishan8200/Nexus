@@ -14,8 +14,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-@WebServlet("/CreateTaskServlet")
-public class CreateTaskServlet extends HttpServlet {
+@WebServlet("/UpdateTaskServlet")
+public class UpdateTaskServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private TaskDAO taskDAO;
 
@@ -43,6 +43,7 @@ public class CreateTaskServlet extends HttpServlet {
 
         try {
             // Extract parameters from form
+            int id = Integer.parseInt(request.getParameter("id"));
             String title = request.getParameter("title");
             String description = request.getParameter("description");
             double wage = Double.parseDouble(request.getParameter("wage"));
@@ -55,8 +56,14 @@ public class CreateTaskServlet extends HttpServlet {
                 estimatedHours = Integer.parseInt(request.getParameter("estimatedHours"));
             } catch (Exception e) {}
             
-            // Create Task object
-            Task task = new Task();
+            // Get existing task to ensure it exists and belongs to this admin (optional but good practice)
+            Task task = taskDAO.getTaskById(id);
+            if (task == null) {
+                out.print("{\"success\": false, \"message\": \"Task not found\"}");
+                return;
+            }
+            
+            // Update fields
             task.setTitle(title);
             task.setDescription(description);
             task.setWage(wage);
@@ -65,19 +72,14 @@ public class CreateTaskServlet extends HttpServlet {
             task.setPriority(priority);
             task.setCategory(category != null ? category : "General");
             task.setEstimatedHours(estimatedHours);
-            task.setCreatedBy(currentUser.getId());
-            task.setStatus("open");
-            
-            // Optional/Default fields
-            task.setRecurrence("none");
             
             // Save to database
-            boolean success = taskDAO.createTask(task);
+            boolean success = taskDAO.updateTask(task, currentUser.getId());
             
             if (success) {
-                out.print("{\"success\": true, \"message\": \"Mission deployed successfully!\"}");
+                out.print("{\"success\": true, \"message\": \"Task updated successfully!\"}");
             } else {
-                out.print("{\"success\": false, \"message\": \"Failed to deploy mission. System error.\"}");
+                out.print("{\"success\": false, \"message\": \"Failed to update task.\"}");
             }
             
         } catch (Exception e) {

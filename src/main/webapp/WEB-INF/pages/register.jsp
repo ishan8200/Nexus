@@ -1,5 +1,14 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
     pageEncoding="UTF-8"%>
+<%@ page import="com.nex.model.User, java.util.*" %>
+<%
+    // Check if user is logged in
+    User currentUser = (User) session.getAttribute("user");
+    
+    // CMS Settings
+    Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
+    if (siteSettings == null) siteSettings = new HashMap<>();
+%>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,13 +24,18 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
+                <img src="${pageContext.request.contextPath}<%= siteSettings.getOrDefault("site_logo_url", "/images/Nexuslogo_1.jpg") %>" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/">Home</a>
                 <a href="${pageContext.request.contextPath}/about">About</a>
                 <a href="${pageContext.request.contextPath}/contact">Contact</a>
-                <a href="${pageContext.request.contextPath}/login" class="btn-login-nav">Login</a>
+                <% if (currentUser != null) { %>
+                    <a href="${pageContext.request.contextPath}/<%= currentUser.getRole().equals("admin") ? "admin" : "worker" %>">Dashboard</a>
+                    <a href="${pageContext.request.contextPath}/logout" class="btn-login-nav">Logout</a>
+                <% } else { %>
+                    <a href="${pageContext.request.contextPath}/login" class="btn-login-nav">Login</a>
+                <% } %>
             </div>
         </div>
     </nav>
@@ -142,6 +156,26 @@
             </div>
         </div>
     </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+            </div>
+            <div class="footer-links">
+                <a href="${pageContext.request.contextPath}/home">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
+            </div>
+            <div class="footer-socials" style="display: flex; gap: 20px; font-size: 1.25rem; margin-top: 10px;">
+                <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-facebook"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-instagram"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-linkedin"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-whatsapp"></i></a>
+            </div>
+        </div>
+    </footer>
 
     <script>
         // Check for server-side error messages

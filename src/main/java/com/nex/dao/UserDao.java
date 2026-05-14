@@ -98,13 +98,51 @@ public class UserDAO {
     }
     
     public void updateLastLogin(int userId) {
-        String sql = "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?";
+        String sql = "UPDATE users SET last_login = CURRENT_TIMESTAMP, failed_attempts = 0 WHERE id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, userId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+    
+    public int incrementFailedAttempts(String email) {
+        String sql = "UPDATE users SET failed_attempts = failed_attempts + 1 WHERE email = ?";
+        String blockSql = "UPDATE users SET status = 'blocked' WHERE email = ? AND failed_attempts >= 5";
+        String selectSql = "SELECT failed_attempts FROM users WHERE email = ?";
+        
+        try (Connection conn = DBConnection.getConnection()) {
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setString(1, email);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(blockSql)) {
+                pstmt.setString(1, email);
+                pstmt.executeUpdate();
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(selectSql)) {
+                pstmt.setString(1, email);
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) return rs.getInt("failed_attempts");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public boolean resetPassword(String email, String newPassword) {
+        String sql = "UPDATE users SET password = ?, failed_attempts = 0, status = CASE WHEN status = 'blocked' THEN 'approved' ELSE status END WHERE email = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, BCrypt.hashpw(newPassword, BCrypt.gensalt()));
+            pstmt.setString(2, email);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
         }
     }
     
@@ -356,7 +394,7 @@ public class UserDAO {
                      "(SELECT COALESCE(SUM(amount), 0) FROM wages WHERE worker_id = ?) AS total_earned, " +
                      "(SELECT COUNT(*) FROM tasks WHERE assigned_to = ? AND status = 'completed') AS tasks_completed, " +
                      "(SELECT COUNT(*) FROM tasks WHERE assigned_to = ?) AS assigned_tasks, " +
-                     "(SELECT COALESCE(AVG(rating), 0) FROM task_submissions WHERE worker_id = ? AND status = 'approved') AS avg_rating, " +
+                     "(SELECT COALESCE(AVG(quality_rating), 0) FROM task_assignments WHERE worker_id = ? AND status = 'approved') AS avg_rating, " +
                      "(SELECT COALESCE(SUM(amount), 0) FROM wages WHERE worker_id = ? AND status = 'pending') AS pending_payment, " +
                      "(SELECT COUNT(*) FROM task_submissions ts JOIN tasks t ON ts.task_id = t.id " +
                      "WHERE ts.worker_id = ? AND ts.submitted_at > t.deadline) AS late_submissions";
@@ -479,6 +517,7 @@ public class UserDAO {
         user.setRating(rs.getDouble("rating"));
         user.setTotalEarned(rs.getDouble("total_earned"));
         user.setTasksCompleted(rs.getInt("tasks_completed"));
+        user.setFailedAttempts(rs.getInt("failed_attempts"));
         user.setCreatedAt(rs.getTimestamp("created_at"));
         user.setLastLogin(rs.getTimestamp("last_login"));
         return user;

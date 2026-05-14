@@ -1,7 +1,9 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="com.nex.model.User" %>
+<%@ page import="com.nex.model.User, java.util.*" %>
 <%
     User currentUser = (User) session.getAttribute("user");
+    Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
+    if (siteSettings == null) siteSettings = new HashMap<>();
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -86,7 +88,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
+                <img src="${pageContext.request.contextPath}<%= siteSettings.getOrDefault("site_logo_url", "/images/Nexuslogo_1.jpg") %>" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/">Home</a>
@@ -115,21 +117,21 @@
                         <div class="method-icon"><i class="fas fa-envelope" style="color: var(--nexus-accent);"></i></div>
                         <div class="method-text">
                             <h4>Email Transmission</h4>
-                            <p>ops@nexusworks.io</p>
+                            <p><%= siteSettings.getOrDefault("contact_email", "ops@nexusworks.io") %></p>
                         </div>
                     </div>
                     <div class="method-item">
                         <div class="method-icon"><i class="fas fa-phone-volume" style="color: var(--nexus-success);"></i></div>
                         <div class="method-text">
                             <h4>Direct Uplink</h4>
-                            <p>+1 (555) 010-9988</p>
+                            <p><%= siteSettings.getOrDefault("contact_phone", "+1 (555) 010-9988") %></p>
                         </div>
                     </div>
                     <div class="method-item">
                         <div class="method-icon"><i class="fas fa-location-dot" style="color: var(--nexus-danger);"></i></div>
                         <div class="method-text">
                             <h4>Operations Base</h4>
-                            <p>Global Decentralized Network</p>
+                            <p><%= siteSettings.getOrDefault("contact_address", "Global Decentralized Network") %></p>
                         </div>
                     </div>
                 </div>
@@ -166,6 +168,69 @@
             </div>
         </div>
     </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+            </div>
+            <div class="footer-links">
+                <a href="${pageContext.request.contextPath}/home">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
+            </div>
+            <div class="footer-socials" style="display: flex; gap: 20px; font-size: 1.25rem; margin-top: 10px;">
+                <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-facebook"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-instagram"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-linkedin"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-whatsapp"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <style>
+        /* Consistent Footer Styles */
+        footer {
+            background: #fafaf8;
+            border-top: 1px solid #e2e2dc;
+            padding: 48px 0;
+            margin-top: 80px;
+        }
+        
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+            color: #7a7a7a;
+            font-size: 0.875rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+        
+        .footer-links {
+            display: flex;
+            gap: 32px;
+        }
+        
+        .footer-links a {
+            color: #7a7a7a;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        
+        .footer-links a:hover {
+            color: #3b82f6;
+        }
+        
+        .footer-socials a:hover {
+            color: #3b82f6 !important;
+            transform: translateY(-3px);
+        }
+    </style>
 
     <script>
         function handleContact(e) {

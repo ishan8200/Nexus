@@ -66,7 +66,7 @@ public class TaskDAO {
         return null;
     }
     
-    public List<Map<String, Object>> getAllTasks(String sortBy, String sortDir, String search) {
+    public List<Map<String, Object>> getAllTasks(int adminId, String sortBy, String sortDir, String search) {
         List<Map<String, Object>> tasks = new ArrayList<>();
         
         // Define allowed sort columns for security
@@ -80,10 +80,10 @@ public class TaskDAO {
         String orderBy = allowedCols.getOrDefault(sortBy, "t.created_at");
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         
-        StringBuilder sql = new StringBuilder("SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id");
+        StringBuilder sql = new StringBuilder("SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id WHERE t.created_by = ?");
         
         if (search != null && !search.trim().isEmpty()) {
-            sql.append(" WHERE t.title LIKE ? OR t.priority LIKE ? OR t.status LIKE ? OR t.category LIKE ? OR u.full_name LIKE ?");
+            sql.append(" AND (t.title LIKE ? OR t.priority LIKE ? OR t.status LIKE ? OR t.category LIKE ? OR u.full_name LIKE ?)");
         }
         
         sql.append(" ORDER BY ").append(orderBy).append(" ").append(dir);
@@ -91,9 +91,10 @@ public class TaskDAO {
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
             
+            pstmt.setInt(1, adminId);
             if (search != null && !search.trim().isEmpty()) {
                 String searchPattern = "%" + search.trim() + "%";
-                for (int i = 1; i <= 5; i++) {
+                for (int i = 2; i <= 6; i++) {
                     pstmt.setString(i, searchPattern);
                 }
             }
@@ -110,6 +111,7 @@ public class TaskDAO {
                     task.put("priority", rs.getString("priority"));
                     task.put("status", rs.getString("status"));
                     task.put("category", rs.getString("category"));
+                    task.put("estimated_hours", rs.getInt("estimated_hours"));
                     task.put("assignedToName", rs.getString("assigned_to_name"));
                     task.put("assigned_to", rs.getInt("assigned_to"));
                     tasks.add(task);
@@ -121,31 +123,33 @@ public class TaskDAO {
         return tasks;
     }
 
-    public List<Map<String, Object>> getAllTasks(String sortBy, String sortDir) {
-        return getAllTasks(sortBy, sortDir, null);
+    public List<Map<String, Object>> getAllTasks(int adminId, String sortBy, String sortDir) {
+        return getAllTasks(adminId, sortBy, sortDir, null);
     }
 
-    public List<Map<String, Object>> getAllTasks() {
-        return getAllTasks("created_at", "DESC");
+    public List<Map<String, Object>> getAllTasks(int adminId) {
+        return getAllTasks(adminId, "created_at", "DESC");
     }
     
-    public String getAllTasksAsJSON() {
-        return gson.toJson(getAllTasks());
+    public String getAllTasksAsJSON(int adminId) {
+        return gson.toJson(getAllTasks(adminId));
     }
     
-    public List<Map<String, Object>> getRecentTasks(int limit) {
+    public List<Map<String, Object>> getRecentTasks(int limit, int adminId) {
         List<Map<String, Object>> tasks = new ArrayList<>();
-        String sql = "SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id ORDER BY t.created_at DESC LIMIT ?";
+        String sql = "SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id WHERE t.created_by = ? ORDER BY t.created_at DESC LIMIT ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, limit);
+            pstmt.setInt(1, adminId);
+            pstmt.setInt(2, limit);
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> task = new HashMap<>();
                 task.put("id", rs.getInt("id"));
                 task.put("title", rs.getString("title"));
-                task.put("status", rs.getString("status"));
-                task.put("deadline", rs.getDate("deadline"));
+                task.put("category", rs.getString("category"));
+                task.put("estimated_hours", rs.getInt("estimated_hours"));
+                task.put("status", rs.getString("status"));                task.put("deadline", rs.getDate("deadline"));
                 task.put("assigned_to_name", rs.getString("assigned_to_name"));
                 tasks.add(task);
             }
@@ -155,8 +159,8 @@ public class TaskDAO {
         return tasks;
     }
     
-    public boolean updateTask(Task task) {
-        String sql = "UPDATE tasks SET title=?, description=?, wage=?, wage_type=?, deadline=?, priority=?, category=?, estimated_hours=?, assigned_to=? WHERE id=?";
+    public boolean updateTask(Task task, int adminId) {
+        String sql = "UPDATE tasks SET title=?, description=?, wage=?, wage_type=?, deadline=?, priority=?, category=?, estimated_hours=?, assigned_to=? WHERE id=? AND created_by=?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, task.getTitle());
@@ -167,8 +171,13 @@ public class TaskDAO {
             pstmt.setString(6, task.getPriority());
             pstmt.setString(7, task.getCategory());
             pstmt.setInt(8, task.getEstimatedHours());
-            pstmt.setInt(9, task.getAssignedTo());
+            if (task.getAssignedTo() > 0) {
+                pstmt.setInt(9, task.getAssignedTo());
+            } else {
+                pstmt.setNull(9, java.sql.Types.INTEGER);
+            }
             pstmt.setInt(10, task.getId());
+            pstmt.setInt(11, adminId);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -176,11 +185,11 @@ public class TaskDAO {
         }
     }
     
-    public boolean deleteTask(int taskId) {
+    public boolean deleteTask(int taskId, int adminId) {
         // We need to delete dependent records first to avoid foreign key violations
         String deleteWagesSql = "DELETE FROM wages WHERE task_id = ?";
         String deleteSubmissionsSql = "DELETE FROM task_submissions WHERE task_id = ?";
-        String deleteTaskSql = "DELETE FROM tasks WHERE id = ?";
+        String deleteTaskSql = "DELETE FROM tasks WHERE id = ? AND created_by = ?";
         
         Connection conn = null;
         try {
@@ -203,6 +212,7 @@ public class TaskDAO {
             int rowsDeleted = 0;
             try (PreparedStatement pstmt = conn.prepareStatement(deleteTaskSql)) {
                 pstmt.setInt(1, taskId);
+                pstmt.setInt(2, adminId);
                 rowsDeleted = pstmt.executeUpdate();
             }
             
@@ -245,52 +255,60 @@ public class TaskDAO {
     
     // ==================== TASK STATISTICS ====================
     
-    public int getTaskCount() {
-        return getTotalTaskCount();
+    public int getTaskCount(int adminId) {
+        return getTotalTaskCount(adminId);
     }
 
-    public int getTotalTaskCount() {
-        String sql = "SELECT COUNT(*) FROM tasks";
+    public int getTotalTaskCount(int adminId) {
+        String sql = "SELECT COUNT(*) FROM tasks WHERE created_by = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return 0;
     }
     
-    public int getCompletedTaskCount() {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'completed'";
+    public int getCompletedTaskCount(int adminId) {
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND created_by = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return 0;
     }
     
-    public int getOpenTaskCount() {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'open'";
+    public int getOpenTaskCount(int adminId) {
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'open' AND created_by = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return 0;
     }
     
-    public int getInProgressTaskCount() {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'in-progress'";
+    public int getInProgressTaskCount(int adminId) {
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'in-progress' AND created_by = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -315,6 +333,25 @@ public class TaskDAO {
     }
     
    public boolean processSubmissionApproval(int assignmentId, int reviewedBy, int rating, String comment) {
+    // Check if the reviewedBy admin is the creator of the task
+    String checkOwnerSql = "SELECT t.created_by FROM tasks t JOIN task_assignments ta ON t.id = ta.task_id WHERE ta.id = ?";
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(checkOwnerSql)) {
+        pstmt.setInt(1, assignmentId);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+            int creatorId = rs.getInt("created_by");
+            if (creatorId != reviewedBy) {
+                return false; // Unauthorized
+            }
+        } else {
+            return false; // Not found
+        }
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
+    }
+
     String sql = "{CALL ApproveTaskWork(?, ?, ?)}";
     try (Connection conn = DBConnection.getConnection();
          CallableStatement cstmt = conn.prepareCall(sql)) {
@@ -342,11 +379,14 @@ public class TaskDAO {
     }
     
     public boolean rejectSubmission(int assignmentId, int reviewedBy, String comment) {
-        String sql = "UPDATE task_assignments SET status = 'rejected', admin_feedback = ?, completed_at = NOW() WHERE id = ? AND status = 'submitted'";
+        String sql = "UPDATE task_assignments ta JOIN tasks t ON ta.task_id = t.id " +
+                     "SET ta.status = 'rejected', ta.admin_feedback = ?, ta.completed_at = NOW() " +
+                     "WHERE ta.id = ? AND ta.status = 'submitted' AND t.created_by = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, comment);
             pstmt.setInt(2, assignmentId);
+            pstmt.setInt(3, reviewedBy);
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
@@ -354,41 +394,45 @@ public class TaskDAO {
         }
     }
     
-    public int getPendingSubmissionCount() {
-        String sql = "SELECT COUNT(*) FROM task_assignments WHERE status = 'submitted'";
+    public int getPendingSubmissionCount(int adminId) {
+        String sql = "SELECT COUNT(*) FROM task_assignments ta JOIN tasks t ON ta.task_id = t.id WHERE ta.status = 'submitted' AND t.created_by = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return 0;
     }
     
-    public List<Map<String, Object>> getPendingSubmissionsList() {
+    public List<Map<String, Object>> getPendingSubmissionsList(int adminId) {
         List<Map<String, Object>> submissions = new ArrayList<>();
         String sql = "SELECT ta.id, ta.task_id, ta.worker_id, ta.submission_text, ta.attachment_path, ta.submitted_at, " +
                      "u.full_name as worker_name, t.title as task_title " +
                      "FROM task_assignments ta " +
                      "JOIN users u ON ta.worker_id = u.id " +
                      "JOIN tasks t ON ta.task_id = t.id " +
-                     "WHERE ta.status = 'submitted' " +
+                     "WHERE ta.status = 'submitted' AND t.created_by = ? " +
                      "ORDER BY ta.submitted_at DESC";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                Map<String, Object> submission = new HashMap<>();
-                submission.put("id", rs.getInt("id"));
-                submission.put("task_id", rs.getInt("task_id"));
-                submission.put("task_title", rs.getString("task_title"));
-                submission.put("worker_id", rs.getInt("worker_id"));
-                submission.put("worker_name", rs.getString("worker_name"));
-                submission.put("submission_text", rs.getString("submission_text"));
-                submission.put("attachment_path", rs.getString("attachment_path"));
-                submission.put("submitted_at", rs.getTimestamp("submitted_at"));
-                submissions.add(submission);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> submission = new HashMap<>();
+                    submission.put("id", rs.getInt("id"));
+                    submission.put("task_id", rs.getInt("task_id"));
+                    submission.put("task_title", rs.getString("task_title"));
+                    submission.put("worker_id", rs.getInt("worker_id"));
+                    submission.put("worker_name", rs.getString("worker_name"));
+                    submission.put("submission_text", rs.getString("submission_text"));
+                    submission.put("attachment_path", rs.getString("attachment_path"));
+                    submission.put("submitted_at", rs.getTimestamp("submitted_at"));
+                    submissions.add(submission);
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -513,6 +557,8 @@ public class TaskDAO {
                     task.put("wage", rs.getDouble("wage"));
                     task.put("deadline", rs.getDate("deadline") != null ? rs.getDate("deadline").toString() : "");
                     task.put("status", rs.getString("status"));
+                    task.put("category", rs.getString("category"));
+                    task.put("estimated_hours", rs.getInt("estimated_hours"));
                     task.put("assignment_status", rs.getString("assignment_status"));
                     tasks.add(task);
                 }
@@ -603,12 +649,18 @@ public class TaskDAO {
         return stats;
     }
     
-    public List<Map<String, Object>> getTaskTrends() {
+    public List<Map<String, Object>> getTaskTrends(int adminId) {
         List<Map<String, Object>> trends = new ArrayList<>();
-        String sql = "{CALL GetTaskTrends()}";
+        String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS date, " +
+                     "COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed, " +
+                     "COUNT(CASE WHEN status = 'open' THEN 1 END) AS open, " +
+                     "COUNT(CASE WHEN status = 'in-progress' THEN 1 END) AS in_progress " +
+                     "FROM tasks WHERE created_by = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) " +
+                     "GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d') ORDER BY date DESC";
         try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql);
-             ResultSet rs = cstmt.executeQuery()) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> trend = new HashMap<>();
                 trend.put("date", rs.getString("date"));
@@ -623,12 +675,13 @@ public class TaskDAO {
         return trends;
     }
 
-    public List<Map<String, Object>> getTasksByCategory() {
+    public List<Map<String, Object>> getTasksByCategory(int adminId) {
         List<Map<String, Object>> categories = new ArrayList<>();
-        String sql = "SELECT category, COUNT(*) as count FROM tasks GROUP BY category";
+        String sql = "SELECT category, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY category";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> cat = new HashMap<>();
                 cat.put("category", rs.getString("category") != null ? rs.getString("category") : "Uncategorized");
@@ -639,6 +692,44 @@ public class TaskDAO {
             e.printStackTrace();
         }
         return categories;
+    }
+
+    public List<Map<String, Object>> getTasksByPriority(int adminId) {
+        List<Map<String, Object>> priorities = new ArrayList<>();
+        String sql = "SELECT priority, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY priority";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> p = new HashMap<>();
+                p.put("priority", rs.getString("priority"));
+                p.put("count", rs.getInt("count"));
+                priorities.add(p);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return priorities;
+    }
+
+    public List<Map<String, Object>> getTasksByStatus(int adminId) {
+        List<Map<String, Object>> statuses = new ArrayList<>();
+        String sql = "SELECT status, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY status";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, adminId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> s = new HashMap<>();
+                s.put("status", rs.getString("status"));
+                s.put("count", rs.getInt("count"));
+                statuses.add(s);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return statuses;
     }
     
     // ==================== HELPER METHODS ====================
@@ -666,11 +757,11 @@ public class TaskDAO {
     // Get worker's ratings
 public List<Map<String, Object>> getWorkerRatings(int workerId) {
     List<Map<String, Object>> ratings = new ArrayList<>();
-    String sql = "SELECT ts.rating, ts.reviewed_at, t.title as task_title " +
-                 "FROM task_submissions ts " +
-                 "JOIN tasks t ON ts.task_id = t.id " +
-                 "WHERE ts.worker_id = ? AND ts.status = 'approved' AND ts.rating IS NOT NULL " +
-                 "ORDER BY ts.reviewed_at DESC LIMIT 10";
+    String sql = "SELECT ta.quality_rating as rating, ta.completed_at as reviewed_at, t.title as task_title " +
+                 "FROM task_assignments ta " +
+                 "JOIN tasks t ON ta.task_id = t.id " +
+                 "WHERE ta.worker_id = ? AND ta.status = 'approved' AND ta.quality_rating IS NOT NULL " +
+                 "ORDER BY ta.completed_at DESC LIMIT 10";
     try (Connection conn = DBConnection.getConnection();
          PreparedStatement pstmt = conn.prepareStatement(sql)) {
         pstmt.setInt(1, workerId);
@@ -693,17 +784,17 @@ public List<Map<String, Object>> getWorkerRatings(int workerId) {
         
         Map<String, String> allowedCols = new HashMap<>();
         allowedCols.put("title", "t.title");
-        allowedCols.put("date", "ts.reviewed_at");
+        allowedCols.put("date", "ta.completed_at");
         allowedCols.put("wage", "t.wage");
-        allowedCols.put("rating", "ts.rating");
+        allowedCols.put("rating", "ta.quality_rating");
         
-        String orderBy = allowedCols.getOrDefault(sortBy, "ts.reviewed_at");
+        String orderBy = allowedCols.getOrDefault(sortBy, "ta.completed_at");
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         
-        StringBuilder sql = new StringBuilder("SELECT t.title, t.wage, t.status as task_status, ts.rating, ts.rating_comment, ts.reviewed_at " +
+        StringBuilder sql = new StringBuilder("SELECT t.title, t.wage, t.status as task_status, ta.quality_rating as rating, ta.admin_feedback as rating_comment, ta.completed_at as reviewed_at " +
                      "FROM tasks t " +
-                     "JOIN task_submissions ts ON t.id = ts.task_id " +
-                     "WHERE ts.worker_id = ? AND t.status = 'completed' AND ts.status = 'approved'");
+                     "JOIN task_assignments ta ON t.id = ta.task_id " +
+                     "WHERE ta.worker_id = ? AND t.status = 'completed' AND ta.status = 'approved'");
         
         if (search != null && !search.trim().isEmpty()) {
             sql.append(" AND t.title LIKE ?");

@@ -7,6 +7,7 @@ import java.util.Map;
 import com.nex.dao.TaskDAO;
 import com.nex.dao.UserDAO;
 import com.nex.dao.WageDAO;
+import com.nex.dao.SettingsDAO;
 import com.nex.model.User;
 
 import jakarta.servlet.ServletException;
@@ -16,13 +17,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-@WebServlet("/admin")
+@WebServlet({"/admin", "/admin/update-settings"})
 public class AdminController extends HttpServlet {
     
     private static final long serialVersionUID = 1L;
     private TaskDAO taskDAO;
     private UserDAO userDAO;
     private WageDAO wageDAO;
+    private SettingsDAO settingsDAO;
     
     @Override
     public void init() throws ServletException {
@@ -30,10 +32,56 @@ public class AdminController extends HttpServlet {
         taskDAO = new TaskDAO();
         userDAO = new UserDAO();
         wageDAO = new WageDAO();
+        settingsDAO = new SettingsDAO();
     }
     
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        handleAdminDashboard(request, response);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        String path = request.getServletPath();
+        if ("/admin/update-settings".equals(path)) {
+            handleUpdateSettings(request, response);
+        } else {
+            doGet(request, response);
+        }
+    }
+
+    private void handleUpdateSettings(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        // Security check
+        HttpSession session = request.getSession(false);
+        User currentUser = (session != null) ? (User) session.getAttribute("user") : null;
+        if (currentUser == null || !"admin".equals(currentUser.getRole())) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
+        String action = request.getParameter("action");
+        if ("updateContent".equals(action)) {
+            String key = request.getParameter("configKey");
+            String value = request.getParameter("configValue");
+            
+            boolean success = settingsDAO.updateSetting(key, value);
+            
+            response.setContentType("application/json");
+            if (success) {
+                response.getWriter().write("{\"success\": true, \"message\": \"Setting updated successfully\"}");
+            } else {
+                response.getWriter().write("{\"success\": false, \"message\": \"Failed to update setting\"}");
+            }
+        }
+    }
+
+    private void handleAdminDashboard(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
         
         HttpSession session = request.getSession(false);
@@ -61,22 +109,27 @@ public class AdminController extends HttpServlet {
         String wageSearch = request.getParameter("wageSearch");
         String paymentSearch = request.getParameter("paymentSearch");
 
-        int totalTasks = taskDAO.getTaskCount();
-        int completedTasks = taskDAO.getCompletedTaskCount();
+        int totalTasks = taskDAO.getTaskCount(currentUser.getId());
+        int completedTasks = taskDAO.getCompletedTaskCount(currentUser.getId());
         int activeWorkers = userDAO.getActiveWorkerCount();
-        double wagesDisbursed = wageDAO.getTotalWagesPaid();
-        int pendingSubmissions = taskDAO.getPendingSubmissionCount();
+        double wagesDisbursed = wageDAO.getTotalWagesPaid(currentUser.getId());
+        int pendingSubmissions = taskDAO.getPendingSubmissionCount(currentUser.getId());
 
-        List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5);
+        List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5, currentUser.getId());
         List<User> pendingWorkersList = userDAO.getPendingWorkersList();
-        List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList();
+        List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList(currentUser.getId());
         List<User> allWorkers = userDAO.getAllWorkers(workerSortBy, workerSortDir, workerSearch);
-        List<Map<String, Object>> allTasks = taskDAO.getAllTasks(taskSortBy, taskSortDir, taskSearch);
-        List<Map<String, Object>> wageSummary = wageDAO.getWageSummary();
-        List<Map<String, Object>> pendingWages = wageDAO.getPendingWagesWithDetails(wageSortBy, wageSortDir, wageSearch);
-        List<Map<String, Object>> paidWages = wageDAO.getPaidWagesWithDetails(paymentSortBy, paymentSortDir, paymentSearch);
-        List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends();
-        List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory();
+        List<Map<String, Object>> allTasks = taskDAO.getAllTasks(currentUser.getId(), taskSortBy, taskSortDir, taskSearch);
+        List<Map<String, Object>> wageSummary = wageDAO.getWageSummary(currentUser.getId());
+        List<Map<String, Object>> pendingWages = wageDAO.getPendingWagesWithDetails(currentUser.getId(), wageSortBy, wageSortDir, wageSearch);
+        List<Map<String, Object>> paidWages = wageDAO.getPaidWagesWithDetails(currentUser.getId(), paymentSortBy, paymentSortDir, paymentSearch);
+        List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends(currentUser.getId());
+        List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory(currentUser.getId());
+        List<Map<String, Object>> tasksByPriority = taskDAO.getTasksByPriority(currentUser.getId());
+        List<Map<String, Object>> tasksByStatus = taskDAO.getTasksByStatus(currentUser.getId());
+        
+        // CMS Settings
+        java.util.Map<String, String> siteSettings = settingsDAO.getAllSettings();
         
         request.setAttribute("totalTasks", totalTasks);
         request.setAttribute("completedTasks", completedTasks);
@@ -93,6 +146,9 @@ public class AdminController extends HttpServlet {
         request.setAttribute("paidWages", paidWages);
         request.setAttribute("taskTrends", taskTrends);
         request.setAttribute("tasksByCategory", tasksByCategory);
+        request.setAttribute("tasksByPriority", tasksByPriority);
+        request.setAttribute("tasksByStatus", tasksByStatus);
+        request.setAttribute("siteSettings", siteSettings);
         request.setAttribute("currentUser", currentUser);
         
         // Preserve sort and search parameters

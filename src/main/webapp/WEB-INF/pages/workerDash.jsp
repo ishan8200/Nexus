@@ -25,6 +25,10 @@
     
     // Formatter for currency
     java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(new Locale("en", "NP"));
+
+    // CMS Settings
+    Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
+    if (siteSettings == null) siteSettings = new HashMap<>();
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -148,7 +152,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
+                <img src="${pageContext.request.contextPath}<%= siteSettings.getOrDefault("site_logo_url", "/images/Nexuslogo_1.jpg") %>" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/">Home</a>
@@ -432,6 +436,10 @@
                                     </span>
                                 </div>
                                 <h3 style="font-size: 18px; font-weight: 700;"><%= task.get("title") %></h3>
+                                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                                    <span style="font-size: 11px; background: var(--nexus-surface); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--nexus-border);"><%= task.get("category") %></span>
+                                    <span style="font-size: 11px; background: var(--nexus-surface); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--nexus-border);"><i class="fas fa-hourglass-half"></i> <%= task.get("estimated_hours") %>h</span>
+                                </div>
                                 <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; flex: 1;">
                                     <%= task.get("description") %>
                                 </p>
@@ -472,6 +480,8 @@
                             <thead>
                                 <tr>
                                     <th class="sortable ${mySortBy == 'title' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'title', 'mySortDir')">Task Title</th>
+                                    <th>Category</th>
+                                    <th>Est. Hours</th>
                                     <th class="sortable ${mySortBy == 'deadline' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'deadline', 'mySortDir')">Deadline</th>
                                     <th class="sortable ${mySortBy == 'wage' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'wage', 'mySortDir')">Wage</th>
                                     <th class="sortable ${mySortBy == 'status' ? (mySortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('mySortBy', 'status', 'mySortDir')">Status</th>
@@ -486,23 +496,34 @@
                                     %>
                                         <tr>
                                             <td style="font-weight: 600;"><%= task.get("title") %></td>
+                                            <td><span class="status-badge" style="background: var(--nexus-surface); color: var(--text-primary); border: 1px solid var(--nexus-border);"><%= task.get("category") %></span></td>
+                                            <td style="text-align: center;"><%= task.get("estimated_hours") %>h</td>
                                             <td><%= task.get("deadline") %></td>
                                             <td style="font-family: 'JetBrains Mono'; font-weight: 700;"><%= cur.format(task.get("wage")) %></td>
                                             <td>
-                                                <span class="status-badge <%= aStatus.toLowerCase().replace("_", "-") %>">
-                                                    <%= aStatus.toUpperCase() %>
-                                                </span>
+                                                <% if ("rejected".equals(aStatus)) { %>
+                                                    <span class="status-badge rejected" style="background: var(--nexus-danger); color: white; margin-bottom: 4px; display: block;">
+                                                        REJECTED - ACTION REQUIRED
+                                                    </span>
+                                                    <div style="font-size: 10px; color: var(--nexus-danger); font-style: italic; max-width: 150px;">
+                                                        "<%= task.get("admin_feedback") != null ? task.get("admin_feedback") : "Needs revisions." %>"
+                                                    </div>
+                                                <% } else { %>
+                                                    <span class="status-badge <%= aStatus.toLowerCase().replace("_", "-") %>">
+                                                        <%= aStatus.toUpperCase() %>
+                                                    </span>
+                                                <% } %>
                                             </td>
                                             <td>
                                                 <% if ("accepted".equals(aStatus)) { %>
                                                     <button onclick="startTask('<%= aId %>', this)" class="btn btn-primary" style="padding: 5px 12px; font-size: 11px;">Start Task</button>
-                                                <% } else if ("in_progress".equals(aStatus)) { %>
+                                                <% } else if ("in_progress".equals(aStatus) || "rejected".equals(aStatus)) { %>
                                                     <button onclick="openSubmitModal(this.getAttribute('data-id'), this.getAttribute('data-title'))" 
                                                             data-id="<%= aId %>"
                                                             data-title="<%= task.get("title").toString().replace("\"", "&quot;") %>"
                                                             class="btn btn-secondary" 
-                                                            style="padding: 5px 12px; font-size: 11px; background: var(--nexus-success); color: white; border: none;">
-                                                        Submit Work
+                                                            style="padding: 5px 12px; font-size: 11px; background: <%= "rejected".equals(aStatus) ? "var(--nexus-danger)" : "var(--nexus-success)" %>; color: white; border: none;">
+                                                        <%= "rejected".equals(aStatus) ? "Resubmit Work" : "Submit Work" %>
                                                     </button>
                                                 <% } else if ("submitted".equals(aStatus)) { %>
                                                     <span style="font-size: 11px; color: var(--text-muted);">Awaiting Review</span>
@@ -841,6 +862,26 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Footer -->
+            <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--nexus-border);">
+                <div class="footer-content" style="max-width: 100%; padding: 0;">
+                    <div class="footer-brand">
+                        <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+                    </div>
+                    <div class="footer-links" style="gap: 20px;">
+                        <a href="${pageContext.request.contextPath}/">Home</a>
+                        <a href="${pageContext.request.contextPath}/about">About</a>
+                        <a href="${pageContext.request.contextPath}/contact">Contact</a>
+                    </div>
+                    <div class="footer-socials" style="display: flex; gap: 15px; font-size: 1rem;">
+                        <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: var(--text-muted);"><i class="fab fa-facebook"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: var(--text-muted);"><i class="fab fa-instagram"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: var(--text-muted);"><i class="fab fa-linkedin"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: var(--text-muted);"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+            </footer>
         </main>
     </div>
 

@@ -54,7 +54,12 @@ public class UpdateProfileServlet extends HttpServlet {
             try {
                 Part filePart = request.getPart("profilePicFile");
                 if (filePart != null && filePart.getSize() > 0) {
-                    String fileName = getFileName(filePart);
+                    String fileName = filePart.getSubmittedFileName();
+                    if (fileName == null || fileName.isEmpty()) {
+                        out.print("{\"success\": false, \"message\": \"Invalid file name.\"}");
+                        return;
+                    }
+                    
                     String extension = "";
                     int i = fileName.lastIndexOf('.');
                     if (i > 0) {
@@ -67,18 +72,21 @@ public class UpdateProfileServlet extends HttpServlet {
                     // Save file to webapp/images directory
                     String uploadPath = getServletContext().getRealPath("") + File.separator + "images";
                     File uploadDir = new File(uploadPath);
-                    if (!uploadDir.exists()) uploadDir.mkdir();
+                    if (!uploadDir.exists()) {
+                        uploadDir.mkdirs();
+                    }
                     
                     filePart.write(uploadPath + File.separator + newFileName);
                     
                     // Update database
                     boolean success = userDAO.updateProfilePicture(currentUser.getId(), newFileName);
                     if (success) {
+                        // Update user in session
                         currentUser.setProfilePic(newFileName);
                         session.setAttribute("user", currentUser);
                         out.print("{\"success\": true, \"message\": \"Profile picture uploaded successfully!\", \"profilePic\": \"" + newFileName + "\"}");
                     } else {
-                        out.print("{\"success\": false, \"message\": \"Failed to update database.\"}");
+                        out.print("{\"success\": false, \"message\": \"Failed to update profile in database.\"}");
                     }
                 } else {
                     out.print("{\"success\": false, \"message\": \"No file selected or file is empty.\"}");
@@ -107,16 +115,5 @@ public class UpdateProfileServlet extends HttpServlet {
             out.print("{\"success\": false, \"message\": \"Invalid action.\"}");
         }
         out.flush();
-    }
-
-    private String getFileName(Part part) {
-        String contentDisp = part.getHeader("content-disposition");
-        String[] tokens = contentDisp.split(";");
-        for (String token : tokens) {
-            if (token.trim().startsWith("filename")) {
-                return token.substring(token.indexOf("=") + 2, token.length() - 1);
-            }
-        }
-        return "";
     }
 }

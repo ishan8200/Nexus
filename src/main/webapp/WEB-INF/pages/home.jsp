@@ -1,12 +1,19 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="com.nex.model.User" %>
+<%@ page import="com.nex.model.User, java.util.*" %>
 <%
     // Check if user is logged in
     HttpSession sessionObj = request.getSession(false);
     User currentUser = (sessionObj != null) ? (User) sessionObj.getAttribute("user") : null;
+
+    // CMS Settings
+    Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
+    if (siteSettings == null) siteSettings = new HashMap<>();
+
+    String announcement = siteSettings.get("system_announcement");
+    boolean hasAnnouncement = announcement != null && !announcement.trim().isEmpty();
 %>
-	
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -433,41 +440,7 @@
             gap: 4px;
         }
         
-        footer {
-            background: #fafaf8;
-            border-top: 1px solid #e2e2dc;
-            padding: 48px 0;
-            margin-top: 80px;
-        }
-        
-        .footer-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 24px;
-            color: #7a7a7a;
-            font-size: 0.875rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 32px;
-        }
-        
-        .footer-links {
-            display: flex;
-            gap: 32px;
-        }
-        
-        .footer-links a {
-            color: #7a7a7a;
-            text-decoration: none;
-            transition: color 0.15s ease;
-        }
-        
-        .footer-links a:hover {
-            color: #3b82f6;
-        }
-        
+               
         @media (max-width: 768px) {
             .section {
                 padding: 48px 0;
@@ -557,11 +530,17 @@
     </style>
 </head>
 <body>
+    <% if (hasAnnouncement) { %>
+        <div style="background: var(--nexus-accent); color: white; padding: 12px; text-align: center; font-size: 14px; font-weight: 600; letter-spacing: 1px; z-index: 2000; position: relative; top: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <i class="fas fa-broadcast-tower" style="margin-right: 10px; animation: pulse 2s infinite;"></i> <%= announcement %>
+        </div>
+    <% } %>
+
     <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
+                <img src="${pageContext.request.contextPath}<%= siteSettings.getOrDefault("site_logo_url", "/images/Nexuslogo_1.jpg") %>" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/" class="active">Home</a>
@@ -585,8 +564,8 @@
     <section class="hero">
         <div class="container hero-content">
             <span class="hero-badge">v3.0 — STRUCTURAL RELEASE</span>
-            <h1>NEXT-GEN OPERATIONAL NEXUS FOR MODERN TEAMS</h1>
-            <p>A raw, structural platform designed for high-velocity project management. No fluff, just pure architectural logic for builders.</p>
+            <h1><%= siteSettings.getOrDefault("home_hero_title", "NEXT-GEN OPERATIONAL NEXUS FOR MODERN TEAMS") %></h1>
+            <p><%= siteSettings.getOrDefault("home_hero_subtitle", "A raw, structural platform designed for high-velocity project management. No fluff, just pure architectural logic for builders.") %></p>
             <div class="btn-group">
                 <% if (currentUser == null) { %>
                     <a href="${pageContext.request.contextPath}/register" class="btn btn-primary">GET STARTED →</a>
@@ -667,18 +646,6 @@
             <div class="media-grid">
                 <div class="media-card">
                     <div class="media-placeholder">
-                        <div class="video-badge"><i class="fas fa-circle-play" style="margin-right: 8px;"></i> VIDEO PREVIEW</div>
-                    </div>
-                    <div class="media-caption">Walkthrough: Nexus Core Architecture</div>
-                </div>
-                <div class="media-card">
-                    <div class="media-placeholder">
-                        <div class="map-badge"><i class="fas fa-earth-americas" style="margin-right: 8px;"></i> GLOBAL NODE MAP</div>
-                    </div>
-                    <div class="media-caption">Real-time Geographic Distribution</div>
-                </div>
-                <div class="media-card">
-                    <div class="media-placeholder">
                         <div class="chart-badge"><i class="fas fa-chart-area" style="margin-right: 8px;"></i> METRIC FLOW</div>
                     </div>
                     <div class="media-caption">Project Velocity Analytics</div>
@@ -713,75 +680,22 @@
         </div>
     </section>
 
-    <!-- Global Nodes + Metric Flow Combined Section -->
-    <section class="section">
-        <div class="container">
-            <div class="grid-2">
-                <!-- Global Nodes -->
-                <div>
-                    <h2>GLOBAL NODES</h2>
-                    <p class="section-subtitle">Track your team across geographic coordinates with real-time latency indicators.</p>
-                    <div class="nodes-container">
-                        <div class="node-row">
-                            <span class="node-location">North America (NA-01)</span>
-                            <span class="latency"><span class="latency-indicator"></span>24ms</span>
-                        </div>
-                        <div class="node-row">
-                            <span class="node-location">Europe (EU-02)</span>
-                            <span class="latency"><span class="latency-indicator"></span>47ms</span>
-                        </div>
-                        <div class="node-row">
-                            <span class="node-location">Asia-Pacific (AP-03)</span>
-                            <span class="latency"><span class="latency-indicator"></span>89ms</span>
-                        </div>
-                        <div class="node-row">
-                            <span class="node-location">South America (SA-04)</span>
-                            <span class="latency"><span class="latency-indicator"></span>112ms</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Metric Flow -->
-                <div>
-                    <h2>METRIC FLOW</h2>
-                    <p class="section-subtitle">Direct observation of project velocity and resource allocation efficiency.</p>
-                    <div class="metrics-panel">
-                        <div class="metric-card">
-                            <div class="metric-label">Project Velocity</div>
-                            <div class="metric-value">284</div>
-                            <div class="metric-trend">↑ +12.4%</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Resource Efficiency</div>
-                            <div class="metric-value">94.2%</div>
-                            <div class="metric-trend">↑ +3.1%</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Active Nodes</div>
-                            <div class="metric-value">47</div>
-                            <div class="metric-trend">Online</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Throughput</div>
-                            <div class="metric-value">1.2M</div>
-                            <div class="metric-trend">ops/sec</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Footer -->
     <footer>
         <div class="footer-content">
-            <div class="copyright">NEXUS © 2025 Nexus Works. All rights reserved.</div>
+            <div class="footer-brand">
+                <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+            </div>
             <div class="footer-links">
-                <a href="#">Privacy</a>
-                <a href="#">Security</a>
-                <a href="#">Status</a>
-                <a href="#">API Docs</a>
-                <a href="#">Support</a>
+                <a href="${pageContext.request.contextPath}/home">Home</a>
+                <a href="${pageContext.request.contextPath}/about">About</a>
+                <a href="${pageContext.request.contextPath}/contact">Contact</a>
+            </div>
+            <div class="footer-socials" style="display: flex; gap: 20px; font-size: 1.25rem; margin-top: 10px;">
+                <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-facebook"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-instagram"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-linkedin"></i></a>
+                <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: #7a7a7a; transition: all 0.3s ease;"><i class="fab fa-whatsapp"></i></a>
             </div>
         </div>
     </footer>

@@ -41,7 +41,7 @@ public class DeleteTaskServlet extends HttpServlet {
 
         try {
             int taskId = Integer.parseInt(request.getParameter("taskId"));
-            boolean success = taskDAO.deleteTask(taskId);
+            boolean success = taskDAO.deleteTask(taskId, currentUser.getId());
             
             if (success) {
                 out.print("{\"success\": true, \"message\": \"Task deleted successfully\"}");

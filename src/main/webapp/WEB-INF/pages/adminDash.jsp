@@ -43,6 +43,10 @@
     if (paymentSortBy == null) paymentSortBy = "date";
     if (paymentSortDir == null) paymentSortDir = "DESC";
     if (paymentSearch == null) paymentSearch = "";
+
+    // CMS Settings
+    Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
+    if (siteSettings == null) siteSettings = new HashMap<>();
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -158,6 +162,13 @@
         .star:hover ~ .star {
             color: var(--nexus-border) !important;
         }
+
+        /* Remove internal scroll from settings and create task cards */
+        #settingsView .admin-card-body,
+        #createTaskView .admin-card-body {
+            max-height: none;
+            overflow: visible;
+        }
     </style>
 </head>
 <body>
@@ -165,14 +176,23 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="${pageContext.request.contextPath}/" class="logo">
-                <img src="${pageContext.request.contextPath}/images/Nexuslogo_1.jpg" alt="Nexus Logo" style="height: 40px; width: auto;">
+                <img src="${pageContext.request.contextPath}<%= siteSettings.getOrDefault("site_logo_url", "/images/Nexuslogo_1.jpg") %>" alt="Nexus Logo" style="height: 40px; width: auto;">
             </a>
             <div class="nav-links">
                 <a href="${pageContext.request.contextPath}/">Home</a>
                 <a href="${pageContext.request.contextPath}/about">About</a>
                 <a href="${pageContext.request.contextPath}/contact">Contact</a>
                 <a href="#" class="active">Dashboard</a>
-                <a href="${pageContext.request.contextPath}/logout" class="btn-login-nav">Logout</a>
+                <div style="display: flex; align-items: center; gap: 10px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--nexus-border);">
+                    <div class="nav-avatar" style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: var(--nexus-accent-light); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--nexus-accent);">
+                        <% if (currentUser.getProfilePic() != null && !currentUser.getProfilePic().isEmpty()) { %>
+                            <img src="${pageContext.request.contextPath}/images/<%= currentUser.getProfilePic() %>" alt="Profile" style="width: 100%; height: 100%; object-fit: cover;">
+                        <% } else { %>
+                            <%= currentUser.getFullName().substring(0, 1).toUpperCase() %>
+                        <% } %>
+                    </div>
+                    <a href="${pageContext.request.contextPath}/logout" class="btn-login-nav" style="margin-left: 0;">Logout</a>
+                </div>
             </div>
         </div>
     </nav>
@@ -246,8 +266,8 @@
                 
                 <div class="nav-section-title">ACCOUNT</div>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('settings')">
-                    <span class="nav-icon"><i class="fas fa-user-shield"></i></span>
-                    <span class="nav-text">Settings</span>
+                    <span class="nav-icon"><i class="fas fa-user-circle"></i></span>
+                    <span class="nav-text">Profile & Settings</span>
                 </a>
             </nav>
         </aside>
@@ -414,9 +434,11 @@
                             <thead>
                                 <tr>
                                     <th class="sortable ${taskSortBy == 'title' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'title', 'taskSortDir')">Task Title</th>
+                                    <th>Category</th>
                                     <th class="sortable ${taskSortBy == 'priority' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'priority', 'taskSortDir')">Priority</th>
                                     <th class="sortable ${taskSortBy == 'status' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'status', 'taskSortDir')">Status</th>
                                     <th class="sortable ${taskSortBy == 'wage' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'wage', 'taskSortDir')">Wage</th>
+                                    <th>Est. Hours</th>
                                     <th class="sortable ${taskSortBy == 'deadline' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'deadline', 'taskSortDir')">Deadline</th>
                                     <th>Action</th>
                                 </tr>
@@ -426,12 +448,26 @@
                                     <% for (Map<String, Object> task : allTasks) { %>
                                         <tr>
                                             <td><strong><%= task.get("title") %></strong></td>
+                                            <td><span class="status-badge" style="background: var(--nexus-surface); color: var(--text-primary); border: 1px solid var(--nexus-border);"><%= task.get("category") %></span></td>
                                             <td><span class="status-badge <%= ((String)task.get("priority")).toLowerCase() %>"><%= task.get("priority") %></span></td>
                                             <td><span class="status-badge <%= ((String)task.get("status")).toLowerCase().replace(" ", "-") %>"><%= task.get("status") %></span></td>
                                             <td style="font-family: 'JetBrains Mono'; font-weight: 700;"><%= cur.format(task.get("wage")) %></td>
+                                            <td style="text-align: center;"><%= task.get("estimated_hours") %>h</td>
                                             <td><%= task.get("deadline") %></td>
                                             <td>
-                                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="deleteTask(<%= task.get("id") %>, this)">Delete</button>
+                                                <div style="display: flex; gap: 5px;">
+                                                    <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" 
+                                                        onclick="openEditTaskModal('<%= task.get("id") %>', this)"
+                                                        data-title="<%= task.get("title") != null ? task.get("title").toString().replace("\"", "&quot;") : "" %>"
+                                                        data-category="<%= task.get("category") %>"
+                                                        data-description="<%= task.get("description") != null ? task.get("description").toString().replace("\"", "&quot;") : "" %>"
+                                                        data-wage="<%= task.get("wage") %>"
+                                                        data-wagetype="<%= task.get("wage_type") %>"
+                                                        data-deadline="<%= task.get("deadline") %>"
+                                                        data-priority="<%= task.get("priority") %>"
+                                                        data-estimatedhours="<%= task.get("estimated_hours") != null ? task.get("estimated_hours") : "0" %>">Edit</button>
+                                                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="deleteTask(<%= task.get("id") %>, this)">Delete</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     <% } %>
@@ -450,9 +486,23 @@
                     </div>
                     <div class="admin-card-body">
                         <form id="createTaskForm" onsubmit="deployMission(event)">
-                            <div class="form-group">
-                                <label class="form-label">Mission Title *</label>
-                                <input type="text" class="input-field" name="title" placeholder="e.g. Neural Engine UI Audit" required>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Mission Title *</label>
+                                    <input type="text" class="input-field" name="title" placeholder="e.g. Neural Engine UI Audit" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Category *</label>
+                                    <select class="input-field" name="category" required>
+                                        <option value="Development">Development</option>
+                                        <option value="Design">Design</option>
+                                        <option value="Marketing">Marketing</option>
+                                        <option value="Data Entry">Data Entry</option>
+                                        <option value="QA">QA</option>
+                                        <option value="Administrative">Administrative</option>
+                                        <option value="General">General</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Operational Context *</label>
@@ -462,6 +512,10 @@
                                 <div class="form-group">
                                     <label class="form-label">Contract Value *</label>
                                     <input type="number" step="0.01" class="input-field" name="wage" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Estimated Hours</label>
+                                    <input type="number" class="input-field" name="estimatedHours" placeholder="e.g. 10" min="0">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Wage Model</label>
@@ -739,12 +793,23 @@
                             <canvas id="trendsChart" style="width: 100%; height: 300px;"></canvas>
                         </div>
                     </div>
+                </div>
+                
+                <div class="dashboard-grid" style="margin-top: 20px;">
                     <div class="admin-card">
                         <div class="admin-card-header">
-                            <h3><i class="fas fa-chart-pie" style="color: var(--nexus-accent); margin-right: 8px;"></i>Mission Distribution</h3>
+                            <h3><i class="fas fa-layer-group" style="color: var(--nexus-accent); margin-right: 8px;"></i>Mission Distribution (Category)</h3>
                         </div>
                         <div class="admin-card-body" style="padding: 20px;">
-                            <canvas id="categoryChart" style="width: 100%; height: 300px;"></canvas>
+                            <canvas id="categoryChart" style="width: 100%; height: 250px;"></canvas>
+                        </div>
+                    </div>
+                    <div class="admin-card">
+                        <div class="admin-card-header">
+                            <h3><i class="fas fa-flag" style="color: #f59e0b; margin-right: 8px;"></i>Mission Distribution (Priority)</h3>
+                        </div>
+                        <div class="admin-card-body" style="padding: 20px;">
+                            <canvas id="priorityChart" style="width: 100%; height: 250px;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -823,7 +888,7 @@
 
             <!-- Settings View -->
             <div id="settingsView" class="page-section">
-                <div class="admin-card" style="max-width: 600px; margin: 0 auto;">
+                <div class="admin-card" style="max-width: 1000px; margin: 0 auto;">
                     <div class="admin-card-header">
                         <h3>⚙️ Administrator Settings</h3>
                     </div>
@@ -866,7 +931,105 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Site CMS Management -->
+                <div class="admin-card" style="max-width: 1000px; margin: 30px auto 0;">
+                    <div class="admin-card-header">
+                        <h3>🌐 Site CMS & Content Management</h3>
+                    </div>
+                    <div class="admin-card-body" style="padding: 25px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <!-- Home Page CMS -->
+                            <div style="background: var(--nexus-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-home" style="color: var(--nexus-accent);"></i> Home Page</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Hero Title</label>
+                                    <input type="text" id="home_hero_title" class="input-field" value="<%= siteSettings.getOrDefault("home_hero_title", "") %>">
+                                    <button onclick="updateSiteSetting('home_hero_title')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Title</button>
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">Hero Subtitle</label>
+                                    <textarea id="home_hero_subtitle" class="textarea-field" rows="3"><%= siteSettings.getOrDefault("home_hero_subtitle", "") %></textarea>
+                                    <button onclick="updateSiteSetting('home_hero_subtitle')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Subtitle</button>
+                                </div>
+                            </div>
+
+                            <!-- About Page CMS -->
+                            <div style="background: var(--nexus-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-info-circle" style="color: var(--nexus-accent);"></i> About & Vision</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Vision Title</label>
+                                    <input type="text" id="about_title" class="input-field" value="<%= siteSettings.getOrDefault("about_title", "") %>">
+                                    <button onclick="updateSiteSetting('about_title')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Vision Title</button>
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">Main Content</label>
+                                    <textarea id="about_content" class="textarea-field" rows="3"><%= siteSettings.getOrDefault("about_content", "") %></textarea>
+                                    <button onclick="updateSiteSetting('about_content')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Content</button>
+                                </div>
+                            </div>
+
+                            <!-- Contact Info CMS -->
+                            <div style="background: var(--nexus-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-address-book" style="color: var(--nexus-accent);"></i> Contact & Support</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Support Email</label>
+                                    <input type="email" id="contact_email" class="input-field" value="<%= siteSettings.getOrDefault("contact_email", "") %>">
+                                    <button onclick="updateSiteSetting('contact_email')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Email</button>
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">Support Phone</label>
+                                    <input type="text" id="contact_phone" class="input-field" value="<%= siteSettings.getOrDefault("contact_phone", "") %>">
+                                    <button onclick="updateSiteSetting('contact_phone')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Phone</button>
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">HQ Address</label>
+                                    <input type="text" id="contact_address" class="input-field" value="<%= siteSettings.getOrDefault("contact_address", "") %>">
+                                    <button onclick="updateSiteSetting('contact_address')" class="btn btn-primary" style="margin-top: 10px; width: 100%; padding: 8px;">Update Address</button>
+                                </div>
+                            </div>
+
+                            <!-- System Controls -->
+                            <div style="background: var(--nexus-surface); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-shield-alt" style="color: var(--nexus-warning);"></i> System Configuration</h4>
+                                <div class="form-group">
+                                    <label class="form-label">Maintenance Mode</label>
+                                    <select id="maintenance_mode" class="select-field">
+                                        <option value="false" <%= "false".equals(siteSettings.get("maintenance_mode")) ? "selected" : "" %>>Operational (Live)</option>
+                                        <option value="true" <%= "true".equals(siteSettings.get("maintenance_mode")) ? "selected" : "" %>>Maintenance (Locked)</option>
+                                    </select>
+                                    <button onclick="updateSiteSetting('maintenance_mode')" class="btn btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px;">Apply Status</button>
+                                </div>
+                                <div class="form-group" style="margin-top: 15px;">
+                                    <label class="form-label">System Announcement</label>
+                                    <input type="text" id="system_announcement" class="input-field" placeholder="Broadcasting message..." value="<%= siteSettings.getOrDefault("system_announcement", "") %>">
+                                    <button onclick="updateSiteSetting('system_announcement')" class="btn btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px;">Broadcast Message</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <!-- Footer -->
+            <footer style="margin-top: 40px; padding: 20px 20px; border-top: 1px solid var(--nexus-border);">
+                <div class="footer-content" style="max-width: 100%; padding: 0;">
+                    <div class="footer-brand">
+                        <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+                    </div>
+                    <div class="footer-links" style="gap: 20px;">
+                        <a href="${pageContext.request.contextPath}/">Home</a>
+                        <a href="${pageContext.request.contextPath}/about">About</a>
+                        <a href="${pageContext.request.contextPath}/contact">Contact</a>
+                    </div>
+                    <div class="footer-socials" style="display: flex; gap: 15px; font-size: 1rem;">
+                        <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: var(--text-muted);"><i class="fab fa-facebook"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: var(--text-muted);"><i class="fab fa-instagram"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: var(--text-muted);"><i class="fab fa-linkedin"></i></a>
+                        <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: var(--text-muted);"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+            </footer>
         </main>
     </div>
 
@@ -914,7 +1077,120 @@
         </div>
     </div>
 
+    <!-- Edit Task Modal -->
+    <div id="editTaskModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Edit Mission Parameters</h3>
+                <button class="modal-close" onclick="closeEditTaskModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editTaskForm" onsubmit="submitTaskEdit(event)">
+                    <input type="hidden" name="id" id="editTaskId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Mission Title *</label>
+                            <input type="text" class="input-field" name="title" id="editTaskTitle" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category *</label>
+                            <select class="input-field" name="category" id="editTaskCategory" required>
+                                <option value="Development">Development</option>
+                                <option value="Design">Design</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Data Entry">Data Entry</option>
+                                <option value="QA">QA</option>
+                                <option value="Administrative">Administrative</option>
+                                <option value="General">General</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Operational Context *</label>
+                        <textarea class="textarea-field" name="description" id="editTaskDescription" rows="4" required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Contract Value *</label>
+                            <input type="number" step="0.01" class="input-field" name="wage" id="editTaskWage" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Estimated Hours</label>
+                            <input type="number" class="input-field" name="estimatedHours" id="editTaskEstimatedHours" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Wage Model</label>
+                            <select class="select-field" name="wageType" id="editTaskWageType">
+                                <option value="fixed">Fixed Rate</option>
+                                <option value="hourly">Hourly Velocity</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Operational Deadline *</label>
+                            <input type="date" class="input-field" name="deadline" id="editTaskDeadline" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mission Priority</label>
+                            <select class="select-field" name="priority" id="editTaskPriority">
+                                <option value="low">Standard</option>
+                                <option value="medium">High</option>
+                                <option value="high">Critical</option>
+                                <option value="urgent">Sovereign Urgent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: 20px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeEditTaskModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
+        function openEditTaskModal(id, btn) {
+            document.getElementById('editTaskId').value = id;
+            document.getElementById('editTaskTitle').value = btn.getAttribute('data-title');
+            document.getElementById('editTaskCategory').value = btn.getAttribute('data-category');
+            document.getElementById('editTaskDescription').value = btn.getAttribute('data-description');
+            document.getElementById('editTaskWage').value = btn.getAttribute('data-wage');
+            document.getElementById('editTaskWageType').value = btn.getAttribute('data-wagetype');
+            document.getElementById('editTaskDeadline').value = btn.getAttribute('data-deadline');
+            document.getElementById('editTaskPriority').value = btn.getAttribute('data-priority');
+            document.getElementById('editTaskEstimatedHours').value = btn.getAttribute('data-estimatedhours');
+            
+            document.getElementById('editTaskModal').classList.add('active');
+        }
+
+        function closeEditTaskModal() {
+            document.getElementById('editTaskModal').classList.remove('active');
+        }
+
+        function submitTaskEdit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new URLSearchParams(new FormData(form));
+            
+            fetch('${pageContext.request.contextPath}/UpdateTaskServlet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast(result.message, 'success');
+                      closeEditTaskModal();
+                      // Refresh the page to show updated data (simple approach)
+                      setTimeout(() => location.reload(), 1000);
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
         function switchToPage(pageId) {
             // Persist active tab
             localStorage.setItem('admin_active_tab', pageId);
@@ -950,7 +1226,7 @@
                 'submissions': 'Review Submissions',
                 'wages': 'Disbursement Center',
                 'paymentHistory': 'Payment History',
-                'settings': 'Security Protocols'
+                'settings': 'Profile & System Settings'
             };
             
             const subtitles = {
@@ -961,7 +1237,7 @@
                 'submissions': 'Audit and validate completed mission objectives.',
                 'wages': 'Financial throughput and payroll management.',
                 'paymentHistory': 'Comprehensive ledger of all finalized operational disbursements.',
-                'settings': 'Configure administrative security and identity signature.'
+                'settings': 'Manage your administrative identity and system configuration.'
             };
             
             document.getElementById('pageTitle').textContent = titles[pageId] || 'Nexus Control';
@@ -1278,6 +1554,28 @@
               });
         }
 
+        function updateSiteSetting(key) {
+            const value = document.getElementById(key).value;
+            fetch('${pageContext.request.contextPath}/admin/update-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=updateContent&configKey=' + key + '&configValue=' + encodeURIComponent(value)
+            }).then(response => response.json())
+              .then(result => {
+                  if (result.success) {
+                      showToast(result.message, 'success');
+                  } else {
+                      showToast(result.message, 'error');
+                  }
+              }).catch(err => showToast('Network error', 'error'));
+        }
+
+        function updateSocialSettings() {
+            const keys = ['social_facebook', 'social_twitter', 'social_linkedin', 'social_github', 'site_logo_url'];
+            keys.forEach(key => {
+                updateSiteSetting(key);
+            });
+        }
         function initCharts() {
             // Data from backend
             <%
@@ -1302,6 +1600,16 @@
                     for (Map<String, Object> c : cats) {
                         catLabels.append("'").append(c.get("category")).append("',");
                         catData.append(c.get("count")).append(",");
+                    }
+                }
+
+                List<Map<String, Object>> priorities = (List<Map<String, Object>>) request.getAttribute("tasksByPriority");
+                StringBuilder priorityLabels = new StringBuilder();
+                StringBuilder priorityData = new StringBuilder();
+                if (priorities != null) {
+                    for (Map<String, Object> p : priorities) {
+                        priorityLabels.append("'").append(p.get("priority")).append("',");
+                        priorityData.append(p.get("count")).append(",");
                     }
                 }
             %>
@@ -1342,6 +1650,24 @@
                     datasets: [{
                         data: [<%= catData.toString() %>],
                         backgroundColor: ['#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Priority Chart
+            const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+            new Chart(priorityCtx, {
+                type: 'pie',
+                data: {
+                    labels: [<%= priorityLabels.toString() %>],
+                    datasets: [{
+                        data: [<%= priorityData.toString() %>],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#6366f1']
                     }]
                 },
                 options: {

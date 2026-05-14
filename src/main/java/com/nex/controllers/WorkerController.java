@@ -24,6 +24,7 @@ public class WorkerController extends HttpServlet {
     private UserDAO userDAO;
     private com.nex.dao.NotificationDAO notificationDAO;
     private com.nex.dao.SkillDAO skillDAO;
+    private com.nex.dao.SettingsDAO settingsDAO;
     
     @Override
     public void init() throws ServletException {
@@ -32,6 +33,7 @@ public class WorkerController extends HttpServlet {
         userDAO = new UserDAO();
         notificationDAO = new com.nex.dao.NotificationDAO();
         skillDAO = new com.nex.dao.SkillDAO();
+        settingsDAO = new com.nex.dao.SettingsDAO();
     }
     
     @Override
@@ -97,6 +99,7 @@ public class WorkerController extends HttpServlet {
         request.setAttribute("workerSkills", workerSkills);
         request.setAttribute("performance", performance);
         request.setAttribute("currentUser", currentUser);
+        request.setAttribute("siteSettings", settingsDAO.getAllSettings());
 
         // Preserve parameters
         request.setAttribute("availSortBy", availSortBy);

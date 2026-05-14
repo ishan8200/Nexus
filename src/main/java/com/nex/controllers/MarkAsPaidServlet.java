@@ -52,6 +52,8 @@ public class MarkAsPaidServlet extends HttpServlet {
                 success = wageDAO.markAsPaid(wageId, currentUser.getId(), transactionId, "System Transfer");
             } else if (workerIdParam != null && !workerIdParam.isEmpty()) {
                 int workerId = Integer.parseInt(workerIdParam);
+                // We need to ensure markWorkerWagesAsPaid also filters by adminId
+                // Let's update WageDAO.markWorkerWagesAsPaid to support ownership
                 success = wageDAO.markWorkerWagesAsPaid(workerId, currentUser.getId(), transactionId);
             }
             

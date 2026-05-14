@@ -50,18 +50,18 @@ public class ExportReportServlet extends HttpServlet {
             if ("workers".equals(type)) {
                 exportWorkers(writer);
             } else if ("financial".equals(type)) {
-                exportFinancial(writer);
+                exportFinancial(writer, user.getId());
             } else if ("trends".equals(type)) {
-                exportTrends(writer);
+                exportTrends(writer, user.getId());
             } else {
-                exportTasks(writer);
+                exportTasks(writer, user.getId());
             }
         }
     }
 
-    private void exportTasks(PrintWriter writer) {
+    private void exportTasks(PrintWriter writer, int adminId) {
         writer.println("ID,Title,Status,Priority,Wage,Deadline,Category");
-        List<Map<String, Object>> tasks = taskDAO.getAllTasks();
+        List<Map<String, Object>> tasks = taskDAO.getAllTasks(adminId);
         for (Map<String, Object> task : tasks) {
             writer.printf("%s,\"%s\",%s,%s,%s,%s,%s\n",
                 task.get("id"),
@@ -89,9 +89,9 @@ public class ExportReportServlet extends HttpServlet {
         }
     }
 
-    private void exportFinancial(PrintWriter writer) {
+    private void exportFinancial(PrintWriter writer, int adminId) {
         writer.println("Worker,Tasks Completed,Total Earned");
-        List<Map<String, Object>> summary = wageDAO.getWageSummary();
+        List<Map<String, Object>> summary = wageDAO.getWageSummary(adminId);
         for (Map<String, Object> row : summary) {
             writer.printf("\"%s\",%s,%.2f\n",
                 row.get("full_name"),
@@ -100,9 +100,9 @@ public class ExportReportServlet extends HttpServlet {
         }
     }
 
-    private void exportTrends(PrintWriter writer) {
+    private void exportTrends(PrintWriter writer, int adminId) {
         writer.println("Date,Completed,Open,In-Progress");
-        List<Map<String, Object>> trends = taskDAO.getTaskTrends();
+        List<Map<String, Object>> trends = taskDAO.getTaskTrends(adminId);
         for (Map<String, Object> t : trends) {
             writer.printf("%s,%s,%s,%s\n",
                 t.get("date"),

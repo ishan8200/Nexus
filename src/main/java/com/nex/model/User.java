@@ -21,6 +21,7 @@ public class User {
     private int tasksCompleted;
     private int assignedTasks;
     private int submissionsMade;
+    private int failedAttempts;
     private Timestamp createdAt;
     private Timestamp lastLogin;
     
@@ -35,6 +36,7 @@ public class User {
         this.phone = phone;
         this.role = role;
         this.status = "pending";
+        this.failedAttempts = 0;
     }
     
     // Getters and Setters
@@ -61,6 +63,9 @@ public class User {
     
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    
+    public int getFailedAttempts() { return failedAttempts; }
+    public void setFailedAttempts(int failedAttempts) { this.failedAttempts = failedAttempts; }
     
     public String getProfilePic() { return profilePic; }
     public void setProfilePic(String profilePic) { this.profilePic = profilePic; }
