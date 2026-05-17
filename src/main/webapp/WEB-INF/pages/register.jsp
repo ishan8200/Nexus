@@ -66,7 +66,7 @@
                         <div class="form-group">
                             <label class="form-label">Username *</label>
                             <div class="input-container">
-                                <input type="text" class="input-field" id="username" name="username" placeholder="johndoe" required>
+                                <input type="text" class="input-field" id="username" name="username" placeholder="ishan" required>
                             </div>
                             <small class="form-hint">Must be unique (letters, numbers, underscore)</small>
                         </div>
@@ -76,7 +76,7 @@
                         <div class="form-group">
                             <label class="form-label">Email Address *</label>
                             <div class="input-container">
-                                <input type="email" class="input-field" id="email" name="email" placeholder="john@example.com" required>
+                                <input type="email" class="input-field" id="email" name="email" placeholder="ishan@nexus.com" required>
                             </div>
                         </div>
 

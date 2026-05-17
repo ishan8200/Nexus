@@ -1,6 +1,13 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="java.util.*, com.nex.model.User" %>
 <%
+    // Dashboard data from controller with safety checks
+    String pageAnalyticsFilter = (String) request.getAttribute("analyticsFilter");
+    if (pageAnalyticsFilter == null) pageAnalyticsFilter = "my";
+    
+    String taskFilter = (String) request.getAttribute("taskFilter");
+    if (taskFilter == null) taskFilter = "my";
+
     // Check if user is logged in and is admin
     User currentUser = (User) request.getAttribute("currentUser");
     if (currentUser == null || !"admin".equals(currentUser.getRole())) {
@@ -8,13 +15,20 @@
         return;
     }
 
-    // Dashboard data from controller with safety checks
+    // Dashboard Statistics
     int totalTasks = request.getAttribute("totalTasks") != null ? (int) request.getAttribute("totalTasks") : 0;
     int completedTasks = request.getAttribute("completedTasks") != null ? (int) request.getAttribute("completedTasks") : 0;
     int activeWorkers = request.getAttribute("activeWorkers") != null ? (int) request.getAttribute("activeWorkers") : 0;
     double wagesDisbursed = request.getAttribute("wagesDisbursed") != null ? (double) request.getAttribute("wagesDisbursed") : 0.0;
     int pendingSubmissions = request.getAttribute("pendingSubmissions") != null ? (int) request.getAttribute("pendingSubmissions") : 0;
-    
+
+    // Performance Metrics
+    double avgRating = request.getAttribute("avgRating") != null ? (double) request.getAttribute("avgRating") : 0.0;
+    double taskEfficiency = request.getAttribute("taskEfficiency") != null ? (double) request.getAttribute("taskEfficiency") : 0.0;
+    double networkGrowth = request.getAttribute("networkGrowth") != null ? (double) request.getAttribute("networkGrowth") : 0.0;
+    double systemHealth = request.getAttribute("systemHealth") != null ? (double) request.getAttribute("systemHealth") : 0.0;
+
+    // List Data
     List<Map<String, Object>> recentTasks = (List<Map<String, Object>>) request.getAttribute("recentTasks");
     if (recentTasks == null) recentTasks = new ArrayList<>();
     
@@ -32,17 +46,43 @@
     
     List<Map<String, Object>> wageSummary = (List<Map<String, Object>>) request.getAttribute("wageSummary");
     if (wageSummary == null) wageSummary = new ArrayList<>();
-    
+
+    List<Map<String, Object>> pendingWages = (List<Map<String, Object>>) request.getAttribute("pendingWages");
+    if (pendingWages == null) pendingWages = new ArrayList<>();
+
+    List<Map<String, Object>> paidWages = (List<Map<String, Object>>) request.getAttribute("paidWages");
+    if (paidWages == null) paidWages = new ArrayList<>();
+
     // Formatter for currency
     java.text.NumberFormat cur = java.text.NumberFormat.getCurrencyInstance(new Locale("en", "NP"));
-    
-    // Payment History sorting/search
+
+    // Search and Sort Parameters
+    String taskSearch = (String) request.getAttribute("taskSearch");
+    String workerSearch = (String) request.getAttribute("workerSearch");
+    String wageSearch = (String) request.getAttribute("wageSearch");
+    String paymentSearch = (String) request.getAttribute("paymentSearch");
+    if (taskSearch == null) taskSearch = "";
+    if (workerSearch == null) workerSearch = "";
+    if (wageSearch == null) wageSearch = "";
+    if (paymentSearch == null) paymentSearch = "";
+
+    String taskSortBy = (String) request.getAttribute("taskSortBy");
+    String taskSortDir = (String) request.getAttribute("taskSortDir");
+    String workerSortBy = (String) request.getAttribute("workerSortBy");
+    String workerSortDir = (String) request.getAttribute("workerSortDir");
+    String wageSortBy = (String) request.getAttribute("wageSortBy");
+    String wageSortDir = (String) request.getAttribute("wageSortDir");
     String paymentSortBy = (String) request.getAttribute("paymentSortBy");
     String paymentSortDir = (String) request.getAttribute("paymentSortDir");
-    String paymentSearch = (String) request.getAttribute("paymentSearch");
+
+    if (taskSortBy == null) taskSortBy = "title";
+    if (taskSortDir == null) taskSortDir = "ASC";
+    if (workerSortBy == null) workerSortBy = "full_name";
+    if (workerSortDir == null) workerSortDir = "ASC";
+    if (wageSortBy == null) wageSortBy = "date";
+    if (wageSortDir == null) wageSortDir = "DESC";
     if (paymentSortBy == null) paymentSortBy = "date";
     if (paymentSortDir == null) paymentSortDir = "DESC";
-    if (paymentSearch == null) paymentSearch = "";
 
     // CMS Settings
     Map<String, String> siteSettings = (Map<String, String>) request.getAttribute("siteSettings");
@@ -163,6 +203,26 @@
             color: var(--nexus-border) !important;
         }
 
+        /* Star Input for Approval */
+        .star-input {
+            font-size: 20px;
+            color: #d1d5db;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .star-input.active {
+            color: var(--nexus-accent);
+        }
+        .star-input:hover, .star-input:hover ~ .star-input {
+            color: var(--nexus-accent-glow);
+        }
+        .rating-stars-input:hover .star-input {
+            color: var(--nexus-accent);
+        }
+        .star-input:hover ~ .star-input {
+            color: #d1d5db !important;
+        }
+
         /* Remove internal scroll from settings and create task cards */
         #settingsView .admin-card-body,
         #createTaskView .admin-card-body {
@@ -247,7 +307,7 @@
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('wages')">
                     <span class="nav-icon"><i class="fas fa-wallet"></i></span>
-                    <span class="nav-text">Wages</span>
+                    <span class="nav-text">Payments</span>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('paymentHistory')">
                     <span class="nav-icon"><i class="fas fa-history"></i></span>
@@ -290,6 +350,12 @@
 
             <!-- Dashboard View -->
             <div id="dashboardView" class="page-section active">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                    <div class="filter-group" style="display: flex; gap: 10px; background: white; padding: 5px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                        <button class="btn <%= "my".equals(pageAnalyticsFilter) ? "btn-primary" : "btn-secondary" %>" style="padding: 6px 12px; font-size: 12px;" onclick="applyAnalyticsFilter('my')">My Stats</button>
+                        <button class="btn <%= "all".equals(pageAnalyticsFilter) ? "btn-primary" : "btn-secondary" %>" style="padding: 6px 12px; font-size: 12px;" onclick="applyAnalyticsFilter('all')">All Stats</button>
+                    </div>
+                </div>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-header">
@@ -389,7 +455,16 @@
                                         </td>
                                         <td style="font-size: 11px;"><%= submission.get("submitted_at") %></td>
                                         <td>
-                                            <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveSubmission(<%= submission.get("id") %>, this)">Approve</button>
+                                            <div style="display: flex; align-items: center; gap: 4px;">
+                                                <select id="rating_<%= submission.get("id") %>" style="font-size: 10px; padding: 2px; border: 1px solid var(--nexus-border); border-radius: 4px; background: white;">
+                                                    <option value="5">5★</option>
+                                                    <option value="4">4★</option>
+                                                    <option value="3">3★</option>
+                                                    <option value="2">2★</option>
+                                                    <option value="1">1★</option>
+                                                </select>
+                                                <button class="btn btn-primary" style="padding: 2px 6px; font-size: 10px;" onclick="approveSubmission(<%= submission.get("id") %>, this)">Approve</button>
+                                            </div>
                                         </td>
                                     </tr>
                                     <% } %>
@@ -417,14 +492,18 @@
             <!-- Tasks View -->
             <div id="tasksView" class="page-section">
                 <div class="admin-card">
-                    <div class="admin-card-header">
+                    <div class="admin-card-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <h3><i class="fas fa-clipboard-list" style="color: var(--nexus-accent); margin-right: 8px;"></i>Mission Repository</h3>
+                        <div class="filter-group" style="display: flex; gap: 10px;">
+                            <button class="btn ${taskFilter == 'my' ? 'btn-primary' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 12px;" onclick="applyTaskFilter('my')">My Posts</button>
+                            <button class="btn ${taskFilter == 'all' ? 'btn-primary' : 'btn-secondary'}" style="padding: 6px 12px; font-size: 12px;" onclick="applyTaskFilter('all')">All Posts</button>
+                        </div>
                     </div>
                     <div class="search-container">
                         <div class="search-group">
                             <div class="search-wrapper">
                                 <span class="search-icon">🔍</span>
-                                <input type="text" id="taskSearch" class="search-input" placeholder="Search missions by title, status, or priority..." value="${taskSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('taskSearch', this.value)">
+                                <input type="text" id="taskSearch" class="search-input" placeholder="Search missions by title, status, or priority..." value="<%= taskSearch %>" onkeypress="if(event.key === 'Enter') serverSideSearch('taskSearch', this.value)">
                             </div>
                             <button class="search-action-btn" onclick="serverSideSearch('taskSearch', document.getElementById('taskSearch').value)">Search</button>
                         </div>
@@ -433,21 +512,30 @@
                         <table class="admin-table" id="tasksTable">
                             <thead>
                                 <tr>
-                                    <th class="sortable ${taskSortBy == 'title' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'title', 'taskSortDir')">Task Title</th>
+                                    <th class="sortable <%= (taskSortBy != null && taskSortBy.equals("title")) ? (taskSortDir != null && taskSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('taskSortBy', 'title', 'taskSortDir')">Task Title</th>
                                     <th>Category</th>
-                                    <th class="sortable ${taskSortBy == 'priority' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'priority', 'taskSortDir')">Priority</th>
-                                    <th class="sortable ${taskSortBy == 'status' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'status', 'taskSortDir')">Status</th>
-                                    <th class="sortable ${taskSortBy == 'wage' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'wage', 'taskSortDir')">Wage</th>
+                                    <th class="sortable <%= (taskSortBy != null && taskSortBy.equals("priority")) ? (taskSortDir != null && taskSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('taskSortBy', 'priority', 'taskSortDir')">Priority</th>
+                                    <th class="sortable <%= (taskSortBy != null && taskSortBy.equals("status")) ? (taskSortDir != null && taskSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('taskSortBy', 'status', 'taskSortDir')">Status</th>
+                                    <th class="sortable <%= (taskSortBy != null && taskSortBy.equals("wage")) ? (taskSortDir != null && taskSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('taskSortBy', 'wage', 'taskSortDir')">Wage</th>
                                     <th>Est. Hours</th>
-                                    <th class="sortable ${taskSortBy == 'deadline' ? (taskSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('taskSortBy', 'deadline', 'taskSortDir')">Deadline</th>
+                                    <th class="sortable <%= (taskSortBy != null && taskSortBy.equals("deadline")) ? (taskSortDir != null && taskSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('taskSortBy', 'deadline', 'taskSortDir')">Deadline</th>
                                     <th>Action</th>
-                                </tr>
+                                 </tr>
                             </thead>
                             <tbody>
                                 <% if (allTasks != null) { %>
                                     <% for (Map<String, Object> task : allTasks) { %>
                                         <tr>
-                                            <td><strong><%= task.get("title") %></strong></td>
+                                            <td>
+                                                <strong><%= task.get("title") %></strong>
+                                                <div style="margin-top: 4px;">
+                                                    <a href="javascript:void(0)" 
+                                                       onclick="viewTaskDescription('<%= task.get("title").toString().replace("'", "\\'") %>', '<%= task.get("description") != null ? task.get("description").toString().replace("'", "\\'").replace("\n", " ").replace("\r", "") : "No description provided." %>')" 
+                                                       style="font-size: 10px; color: var(--nexus-accent); text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                                                        <i class="fas fa-eye"></i> View Details
+                                                    </a>
+                                                </div>
+                                             </td>
                                             <td><span class="status-badge" style="background: var(--nexus-surface); color: var(--text-primary); border: 1px solid var(--nexus-border);"><%= task.get("category") %></span></td>
                                             <td><span class="status-badge <%= ((String)task.get("priority")).toLowerCase() %>"><%= task.get("priority") %></span></td>
                                             <td><span class="status-badge <%= ((String)task.get("status")).toLowerCase().replace(" ", "-") %>"><%= task.get("status") %></span></td>
@@ -456,20 +544,42 @@
                                             <td><%= task.get("deadline") %></td>
                                             <td>
                                                 <div style="display: flex; gap: 5px;">
-                                                    <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" 
-                                                        onclick="openEditTaskModal('<%= task.get("id") %>', this)"
-                                                        data-title="<%= task.get("title") != null ? task.get("title").toString().replace("\"", "&quot;") : "" %>"
-                                                        data-category="<%= task.get("category") %>"
-                                                        data-description="<%= task.get("description") != null ? task.get("description").toString().replace("\"", "&quot;") : "" %>"
-                                                        data-wage="<%= task.get("wage") %>"
-                                                        data-wagetype="<%= task.get("wage_type") %>"
-                                                        data-deadline="<%= task.get("deadline") %>"
-                                                        data-priority="<%= task.get("priority") %>"
-                                                        data-estimatedhours="<%= task.get("estimated_hours") != null ? task.get("estimated_hours") : "0" %>">Edit</button>
-                                                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="deleteTask(<%= task.get("id") %>, this)">Delete</button>
+                                                    <% 
+                                                        String status = (String)task.get("status");
+                                                        boolean isCreator = task.get("created_by") != null && (int)task.get("created_by") == currentUser.getId();
+                                                        boolean isEditable = isCreator && !"completed".equalsIgnoreCase(status);
+                                                        boolean isDeletable = isCreator && !"completed".equalsIgnoreCase(status) && !"in-progress".equalsIgnoreCase(status);
+                                                    %>
+                                                    
+                                                    <% if (isCreator) { %>
+                                                        <% if (isEditable) { %>
+                                                            <button class="btn btn-primary" style="padding: 4px 8px; font-size: 11px;" 
+                                                                onclick="openEditTaskModal('<%= task.get("id") %>', this)"
+                                                                data-title="<%= task.get("title") != null ? task.get("title").toString().replace("\"", "&quot;") : "" %>"
+                                                                data-category="<%= task.get("category") %>"
+                                                                data-description="<%= task.get("description") != null ? task.get("description").toString().replace("\"", "&quot;") : "" %>"
+                                                                data-wage="<%= task.get("wage") %>"
+                                                                data-wagetype="<%= task.get("wage_type") %>"
+                                                                data-deadline="<%= task.get("deadline") %>"
+                                                                data-priority="<%= task.get("priority") %>"
+                                                                data-estimatedhours="<%= task.get("estimated_hours") != null ? task.get("estimated_hours") : "0" %>">Edit</button>
+                                                        <% } %>
+                                                        
+                                                        <% if (isDeletable) { %>
+                                                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="deleteTask(<%= task.get("id") %>, this)">Delete</button>
+                                                        <% } %>
+                                                        
+                                                        <% if (!isEditable && !isDeletable) { %>
+                                                            <span style="font-size: 10px; color: var(--text-muted); font-style: italic;">Locked (Finalized)</span>
+                                                        <% } else if (!isDeletable && isEditable) { %>
+                                                            <span style="font-size: 10px; color: var(--text-muted); font-style: italic;">Locked (Active)</span>
+                                                        <% } %>
+                                                    <% } else { %>
+                                                        <span style="font-size: 10px; color: var(--text-muted); font-style: italic;">Read-only (Other Admin)</span>
+                                                    <% } %>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                             </td>
+                                         </tr>
                                     <% } %>
                                 <% } %>
                             </tbody>
@@ -559,7 +669,7 @@
                         <div class="search-group">
                             <div class="search-wrapper">
                                 <span class="search-icon">🔍</span>
-                                <input type="text" id="workerSearch" class="search-input" placeholder="Search talent by name, email, or status..." value="${workerSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('workerSearch', this.value)">
+                                <input type="text" id="workerSearch" class="search-input" placeholder="Search talent by name, email, or status..." value="<%= workerSearch %>" onkeypress="if(event.key === 'Enter') serverSideSearch('workerSearch', this.value)">
                             </div>
                             <button class="search-action-btn" onclick="serverSideSearch('workerSearch', document.getElementById('workerSearch').value)">Search</button>
                         </div>
@@ -568,11 +678,11 @@
                         <table class="admin-table" id="workersTable">
                             <thead>
                                 <tr>
-                                    <th class="sortable ${workerSortBy == 'full_name' ? (workerSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('workerSortBy', 'full_name', 'workerSortDir')">Full Name</th>
-                                    <th class="sortable ${workerSortBy == 'tasks' ? (workerSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('workerSortBy', 'tasks', 'workerSortDir')">Tasks</th>
-                                    <th class="sortable ${workerSortBy == 'rating' ? (workerSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('workerSortBy', 'rating', 'workerSortDir')">Rating</th>
-                                    <th class="sortable ${workerSortBy == 'earned' ? (workerSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('workerSortBy', 'earned', 'workerSortDir')">Total Earned</th>
-                                    <th class="sortable ${workerSortBy == 'status' ? (workerSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('workerSortBy', 'status', 'workerSortDir')">Status</th>
+                                    <th class="sortable <%= (workerSortBy != null && workerSortBy.equals("full_name")) ? (workerSortDir != null && workerSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('workerSortBy', 'full_name', 'workerSortDir')">Full Name</th>
+                                    <th class="sortable <%= (workerSortBy != null && workerSortBy.equals("tasks")) ? (workerSortDir != null && workerSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('workerSortBy', 'tasks', 'workerSortDir')">Tasks</th>
+                                    <th class="sortable <%= (workerSortBy != null && workerSortBy.equals("rating")) ? (workerSortDir != null && workerSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('workerSortBy', 'rating', 'workerSortDir')">Rating</th>
+                                    <th class="sortable <%= (workerSortBy != null && workerSortBy.equals("earned")) ? (workerSortDir != null && workerSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('workerSortBy', 'earned', 'workerSortDir')">Total Earned</th>
+                                    <th class="sortable <%= (workerSortBy != null && workerSortBy.equals("status")) ? (workerSortDir != null && workerSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('workerSortBy', 'status', 'workerSortDir')">Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -661,6 +771,15 @@
                                     </div>
                                 <% } %>
                             </div>
+                            <div class="rating-input" style="margin-bottom: 15px;">
+                                <label class="form-label" style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Quality Rating:</label>
+                                <div class="rating-stars-input" data-submission-id="<%= submission.get("id") %>" style="display: flex; gap: 5px; margin-top: 5px;">
+                                    <% for(int i = 1; i <= 5; i++) { %>
+                                        <span class="star-input <%= i <= 5 ? "active" : "" %>" data-value="<%= i %>" onclick="setApprovalRating(<%= submission.get("id") %>, <%= i %>)">★</span>
+                                    <% } %>
+                                    <input type="hidden" id="rating_<%= submission.get("id") %>" value="5">
+                                </div>
+                            </div>
                             <div style="display: flex; gap: 10px;">
                                 <button class="btn btn-primary" style="padding: 8px 16px;" onclick="approveSubmission(<%= submission.get("id") %>, this)">Approve</button>
                                 <button class="btn btn-secondary" style="padding: 8px 16px;" onclick="rejectSubmission(<%= submission.get("id") %>, this)">Reject</button>
@@ -684,7 +803,7 @@
                         <div class="search-group">
                             <div class="search-wrapper">
                                 <span class="search-icon">🔍</span>
-                                <input type="text" id="wageSearch" class="search-input" placeholder="Search by worker or task..." value="${wageSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('wageSearch', this.value)">
+                                <input type="text" id="wageSearch" class="search-input" placeholder="Search by worker or task..." value="<%= wageSearch %>" onkeypress="if(event.key === 'Enter') serverSideSearch('wageSearch', this.value)">
                             </div>
                             <button class="search-action-btn" onclick="serverSideSearch('wageSearch', document.getElementById('wageSearch').value)">Search</button>
                         </div>
@@ -693,16 +812,16 @@
                         <table class="admin-table" id="wagesTable">
                             <thead>
                                 <tr>
-                                    <th class="sortable ${wageSortBy == 'worker' ? (wageSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('wageSortBy', 'worker', 'wageSortDir')">Worker</th>
-                                    <th class="sortable ${wageSortBy == 'task' ? (wageSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('wageSortBy', 'task', 'wageSortDir')">Task Title</th>
-                                    <th class="sortable ${wageSortBy == 'amount' ? (wageSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('wageSortBy', 'amount', 'wageSortDir')">Amount</th>
-                                    <th class="sortable ${wageSortBy == 'date' ? (wageSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('wageSortBy', 'date', 'wageSortDir')">Approved Date</th>
+                                    <th class="sortable <%= (wageSortBy != null && wageSortBy.equals("worker")) ? (wageSortDir != null && wageSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('wageSortBy', 'worker', 'wageSortDir')">Worker</th>
+                                    <th class="sortable <%= (wageSortBy != null && wageSortBy.equals("task")) ? (wageSortDir != null && wageSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('wageSortBy', 'task', 'wageSortDir')">Task Title</th>
+                                    <th class="sortable <%= (wageSortBy != null && wageSortBy.equals("amount")) ? (wageSortDir != null && wageSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('wageSortBy', 'amount', 'wageSortDir')">Amount</th>
+                                    <th class="sortable <%= (wageSortBy != null && wageSortBy.equals("date")) ? (wageSortDir != null && wageSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('wageSortBy', 'date', 'wageSortDir')">Approved Date</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <% 
-                                    List<Map<String, Object>> pendingWages = (List<Map<String, Object>>) request.getAttribute("pendingWages");
+                                    // Use the existing pendingWages variable declared at the top
                                     if (pendingWages != null) {
                                         for (Map<String, Object> wage : pendingWages) { 
                                 %>
@@ -738,7 +857,7 @@
                         <div class="search-group">
                             <div class="search-wrapper">
                                 <span class="search-icon">🔍</span>
-                                <input type="text" id="paymentSearch" class="search-input" placeholder="Search by worker, task, or transaction ID..." value="${paymentSearch}" onkeypress="if(event.key === 'Enter') serverSideSearch('paymentSearch', this.value)">
+                                <input type="text" id="paymentSearch" class="search-input" placeholder="Search by worker, task, or transaction ID..." value="<%= paymentSearch %>" onkeypress="if(event.key === 'Enter') serverSideSearch('paymentSearch', this.value)">
                             </div>
                             <button class="search-action-btn" onclick="serverSideSearch('paymentSearch', document.getElementById('paymentSearch').value)">Search</button>
                         </div>
@@ -747,17 +866,17 @@
                         <table class="admin-table" id="paymentsTable">
                             <thead>
                                 <tr>
-                                    <th class="sortable ${paymentSortBy == 'worker' ? (paymentSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('paymentSortBy', 'worker', 'paymentSortDir')">Worker</th>
-                                    <th class="sortable ${paymentSortBy == 'task' ? (paymentSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('paymentSortBy', 'task', 'paymentSortDir')">Task Title</th>
-                                    <th class="sortable ${paymentSortBy == 'amount' ? (paymentSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('paymentSortBy', 'amount', 'paymentSortDir')">Amount</th>
-                                    <th class="sortable ${paymentSortBy == 'method' ? (paymentSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('paymentSortBy', 'method', 'paymentSortDir')">Method</th>
-                                    <th class="sortable ${paymentSortBy == 'date' ? (paymentSortDir == 'ASC' ? 'sort-asc' : 'sort-desc') : ''}" onclick="serverSideSort('paymentSortBy', 'date', 'paymentSortDir')">Paid Date</th>
+                                    <th class="sortable <%= (paymentSortBy != null && paymentSortBy.equals("worker")) ? (paymentSortDir != null && paymentSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('paymentSortBy', 'worker', 'paymentSortDir')">Worker</th>
+                                    <th class="sortable <%= (paymentSortBy != null && paymentSortBy.equals("task")) ? (paymentSortDir != null && paymentSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('paymentSortBy', 'task', 'paymentSortDir')">Task Title</th>
+                                    <th class="sortable <%= (paymentSortBy != null && paymentSortBy.equals("amount")) ? (paymentSortDir != null && paymentSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('paymentSortBy', 'amount', 'paymentSortDir')">Amount</th>
+                                    <th class="sortable <%= (paymentSortBy != null && paymentSortBy.equals("method")) ? (paymentSortDir != null && paymentSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('paymentSortBy', 'method', 'paymentSortDir')">Method</th>
+                                    <th class="sortable <%= (paymentSortBy != null && paymentSortBy.equals("date")) ? (paymentSortDir != null && paymentSortDir.equals("ASC") ? "sort-asc" : "sort-desc") : "" %>" onclick="serverSideSort('paymentSortBy', 'date', 'paymentSortDir')">Paid Date</th>
                                     <th>Transaction ID</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <% 
-                                    List<Map<String, Object>> paidWages = (List<Map<String, Object>>) request.getAttribute("paidWages");
+                                    // Use the existing paidWages variable declared at the top
                                     if (paidWages != null) {
                                         for (Map<String, Object> payment : paidWages) { 
                                 %>
@@ -784,6 +903,12 @@
 
             <!-- Analytics View -->
             <div id="analyticsView" class="page-section">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+                    <div class="filter-group" style="display: flex; gap: 10px; background: white; padding: 5px; border-radius: var(--radius-md); border: 1px solid var(--nexus-border);">
+                        <button class="btn <%= "my".equals(pageAnalyticsFilter) ? "btn-primary" : "btn-secondary" %>" style="padding: 6px 12px; font-size: 12px;" onclick="applyAnalyticsFilter('my')">My Stats</button>
+                        <button class="btn <%= "all".equals(pageAnalyticsFilter) ? "btn-primary" : "btn-secondary" %>" style="padding: 6px 12px; font-size: 12px;" onclick="applyAnalyticsFilter('all')">All Stats</button>
+                    </div>
+                </div>
                 <div class="dashboard-grid">
                     <div class="admin-card">
                         <div class="admin-card-header">
@@ -821,20 +946,20 @@
                     <div class="admin-card-body" style="padding: 20px;">
                         <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
                             <div class="stat-card" style="padding: 15px;">
-                                <div class="stat-label">System Uptime</div>
-                                <div class="stat-value" style="font-size: 20px;">99.9%</div>
+                                <div class="stat-label">System Health</div>
+                                <div class="stat-value" style="font-size: 20px; color: var(--nexus-success);"><%= String.format("%.1f", systemHealth) %>%</div>
                             </div>
                             <div class="stat-card" style="padding: 15px;">
                                 <div class="stat-label">Avg Quality</div>
-                                <div class="stat-value" style="font-size: 20px;">4.8 ★</div>
+                                <div class="stat-value" style="font-size: 20px; color: var(--nexus-accent);"><%= String.format("%.1f", avgRating) %> ★</div>
                             </div>
                             <div class="stat-card" style="padding: 15px;">
                                 <div class="stat-label">Task Efficiency</div>
-                                <div class="stat-value" style="font-size: 20px;">87%</div>
+                                <div class="stat-value" style="font-size: 20px; color: #8b5cf6;"><%= (int)taskEfficiency %>%</div>
                             </div>
                             <div class="stat-card" style="padding: 15px;">
                                 <div class="stat-label">Network Growth</div>
-                                <div class="stat-value" style="font-size: 20px;">+12%</div>
+                                <div class="stat-value" style="font-size: 20px; color: <%= networkGrowth >= 0 ? "var(--nexus-success)" : "var(--nexus-danger)" %>;"><%= networkGrowth >= 0 ? "+" : "" %><%= String.format("%.1f", networkGrowth) %>%</div>
                             </div>
                         </div>
                     </div>
@@ -1150,7 +1275,46 @@
         </div>
     </div>
 
+    <!-- Task Description Modal -->
+    <div id="taskDescriptionModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="descModalTitle">Mission Context</h3>
+                <button class="modal-close" onclick="closeTaskDescriptionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="padding: 20px; background: var(--nexus-surface); border: 1px solid var(--nexus-border); border-radius: var(--radius-md); line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;" id="descModalContent">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeTaskDescriptionModal()">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        function viewTaskDescription(title, description) {
+            document.getElementById('descModalTitle').textContent = title;
+            document.getElementById('descModalContent').textContent = description;
+            document.getElementById('taskDescriptionModal').classList.add('active');
+        }
+
+        function closeTaskDescriptionModal() {
+            document.getElementById('taskDescriptionModal').classList.remove('active');
+        }
+
+        function applyTaskFilter(filter) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('taskFilter', filter);
+            window.location.href = url.toString();
+        }
+
+        function applyAnalyticsFilter(filter) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('pageAnalyticsFilter', filter);
+            window.location.href = url.toString();
+        }
+
         function openEditTaskModal(id, btn) {
             document.getElementById('editTaskId').value = id;
             document.getElementById('editTaskTitle').value = btn.getAttribute('data-title');
@@ -1183,7 +1347,6 @@
                   if (result.success) {
                       showToast(result.message, 'success');
                       closeEditTaskModal();
-                      // Refresh the page to show updated data (simple approach)
                       setTimeout(() => location.reload(), 1000);
                   } else {
                       showToast(result.message, 'error');
@@ -1192,22 +1355,18 @@
         }
 
         function switchToPage(pageId) {
-            // Persist active tab
             localStorage.setItem('admin_active_tab', pageId);
             
-            // Hide all sections
             document.querySelectorAll('.page-section').forEach(section => {
                 section.classList.remove('active');
             });
             
-            // Show target section
             const targetSection = document.getElementById(pageId + 'View');
             if (targetSection) {
                 targetSection.classList.add('active');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
             
-            // Update sidebar active state
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
             });
@@ -1217,7 +1376,6 @@
                 activeItem.classList.add('active');
             }
             
-            // Update page titles
             const titles = {
                 'dashboard': 'Admin Dashboard',
                 'tasks': 'Mission Repository',
@@ -1244,12 +1402,9 @@
             document.getElementById('pageSubtitle').textContent = subtitles[pageId] || 'Mission Command';
         }
 
-        // Handle mobile toggle
         document.getElementById('sidebarToggle').addEventListener('click', function() {
             document.getElementById('sidebar').classList.toggle('open');
         });
-
-        // --- Functional Handlers (Restored) ---
 
         function deployMission(event) {
             event.preventDefault();
@@ -1264,9 +1419,7 @@
               .then(result => {
                   if (result.success) {
                       showToast(result.message, 'success');
-                      form.reset();
-                      // Switch to tasks page to see the new task or stay on dashboard
-                      // For now, let's just stay and show success
+                      setTimeout(() => location.reload(), 1000);
                   } else {
                       showToast(result.message, 'error');
                   }
@@ -1297,7 +1450,6 @@
               .then(result => {
                   if (result.success) {
                       showToast('Worker approved successfully!', 'success');
-                      // Remove the row or update status without reload
                       const row = btn.closest('tr');
                       if (row) {
                           const statusBadge = row.querySelector('.status-badge');
@@ -1307,7 +1459,6 @@
                           }
                           btn.remove();
                       }
-                      // If in dashboard pending approvals table, remove row
                       if (btn.closest('#dashboardView')) row.remove();
                   } else {
                       showToast('Error: ' + result.message, 'error');
@@ -1316,22 +1467,44 @@
         }
 
         function approveSubmission(id, btn) {
-            if (!confirm('Approve this task submission?')) return;
+            // Get rating from input if it exists
+            const ratingInput = document.getElementById('rating_' + id);
+            const rating = ratingInput ? ratingInput.value : 5;
+            const comment = prompt('Feedback for worker (optional):', 'Approved via Admin Dashboard');
+            if (comment === null) return; // Cancelled
+
+            if (!confirm('Approve this task submission with ' + rating + ' star rating?')) return;
             fetch('${pageContext.request.contextPath}/ApproveSubmissionServlet', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'submissionId=' + id + '&action=approve'
+                body: 'submissionId=' + id + '&action=approve&rating=' + rating + '&comment=' + encodeURIComponent(comment)
             }).then(response => response.json())
               .then(result => {
                   if (result.success) {
                       showToast('Submission approved and payment recorded!', 'success');
-                      // Dynamically remove the submission card or row
                       const container = btn.closest('.submission-card') || btn.closest('tr');
                       if (container) container.remove();
                   } else {
                       showToast('Error: ' + result.message, 'error');
                   }
               }).catch(err => showToast('Network error', 'error'));
+        }
+
+        function setApprovalRating(id, rating) {
+            const container = document.querySelector(`.rating-stars-input[data-submission-id="\${id}"]`);
+            if (!container) return;
+            
+            const stars = container.querySelectorAll('.star-input');
+            stars.forEach((s, index) => {
+                if (index < rating) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+            
+            const input = document.getElementById('rating_' + id);
+            if (input) input.value = rating;
         }
 
         function rejectSubmission(id, btn) {
@@ -1383,8 +1556,8 @@
             }).then(response => response.json())
               .then(result => {
                   if (result.success) {
-                      showToast('Mission deleted successfully', 'success');
-                      btn.closest('tr').remove();
+                      showToast(result.message, 'success');
+                      setTimeout(() => location.reload(), 1000);
                   } else {
                       showToast(result.message, 'error');
                   }
@@ -1393,10 +1566,7 @@
 
         function auditWage(workerId) {
             alert('Opening financial audit for worker ID: ' + workerId + '\nThis feature will display a detailed breakdown of all tasks and payouts in a modal.');
-            // Implementation for a real audit modal can go here
         }
-
-        // --- Worker Management Modal Functions ---
 
         function manageWorker(id, status, btn) {
             document.getElementById('modalWorkerId').value = id;
@@ -1415,12 +1585,12 @@
             const btnReject = document.getElementById('btnReject');
             if (status === 'blocked') {
                 btnReject.textContent = 'Unblock Worker';
-                btnReject.style.color = '#059669'; // success color
+                btnReject.style.color = '#059669';
                 btnReject.style.borderColor = 'rgba(16, 185, 129, 0.2)';
                 btnReject.onclick = function() { updateWorkerStatus(id, 'approved'); };
             } else {
                 btnReject.textContent = 'Block Worker';
-                btnReject.style.color = '#dc2626'; // danger color
+                btnReject.style.color = '#dc2626';
                 btnReject.style.borderColor = 'rgba(239, 68, 68, 0.2)';
                 btnReject.onclick = function() { updateWorkerStatus(id, 'blocked'); };
             }
@@ -1434,7 +1604,7 @@
 
         function updateWorkerStatus(id, newStatus) {
             const actionText = newStatus === 'blocked' ? 'block' : 'unblock';
-            if (!confirm(`Are you sure you want to \${actionText} this worker?`)) return;
+            if (!confirm(`Are you sure you want to ${actionText} this worker?`)) return;
             
             fetch('${pageContext.request.contextPath}/ManageWorkerServlet', {
                 method: 'POST',
@@ -1443,17 +1613,8 @@
             }).then(response => response.json())
               .then(result => {
                   if (result.success) {
-                      showToast(result.message, 'success');
-                      // Update the worker row in the table dynamically
-                      const row = document.querySelector(`button[onclick*="manageWorker(\${id},"]`)?.closest('tr');
-                      if (row) {
-                          const statusBadge = row.querySelector('.status-badge');
-                          if (statusBadge) {
-                              statusBadge.className = 'status-badge ' + newStatus.toLowerCase();
-                              statusBadge.textContent = newStatus.toUpperCase();
-                          }
-                      }
-                      closeWorkerModal();
+                      showToast(result.message || 'Operation successful!', 'success');
+                      setTimeout(() => location.reload(), 1000);
                   } else {
                       showToast(result.message, 'error');
                   }
@@ -1469,7 +1630,6 @@
               .then(result => {
                   if (result.success) {
                       showToast('Worker rated: ' + rating + ' stars', 'success');
-                      // Update stars UI
                       const container = starElem.parentElement;
                       const stars = container.querySelectorAll('.star');
                       stars.forEach((s, index) => {
@@ -1536,14 +1696,12 @@
               .then(result => {
                   if (result.success) {
                       showToast(result.message, 'success');
-                      // Update avatars on the page
                       const avatarUrl = '${pageContext.request.contextPath}/images/' + result.profilePic;
                       const avatarHtml = `<img src="\${avatarUrl}" alt="Avatar" style="width: 100%; height: 100%; border-radius: var(--radius-lg); object-fit: cover;">`;
                       
                       document.getElementById('sidebarAvatar').innerHTML = avatarHtml;
                       document.getElementById('settingsAvatar').innerHTML = avatarHtml;
                       
-                      // Clear input
                       fileInput.value = '';
                   } else {
                       showToast(result.message, 'error');
@@ -1576,8 +1734,8 @@
                 updateSiteSetting(key);
             });
         }
+        
         function initCharts() {
-            // Data from backend
             <%
                 List<Map<String, Object>> trends = (List<Map<String, Object>>) request.getAttribute("taskTrends");
                 List<Map<String, Object>> cats = (List<Map<String, Object>>) request.getAttribute("tasksByCategory");
@@ -1614,7 +1772,6 @@
                 }
             %>
 
-            // Trends Chart
             const trendsCtx = document.getElementById('trendsChart').getContext('2d');
             new Chart(trendsCtx, {
                 type: 'line',
@@ -1641,7 +1798,6 @@
                 }
             });
 
-            // Category Chart
             const catCtx = document.getElementById('categoryChart').getContext('2d');
             new Chart(catCtx, {
                 type: 'doughnut',
@@ -1659,7 +1815,6 @@
                 }
             });
 
-            // Priority Chart
             const priorityCtx = document.getElementById('priorityChart').getContext('2d');
             new Chart(priorityCtx, {
                 type: 'pie',
@@ -1678,14 +1833,10 @@
             });
         }
 
-        // Handle URL parameters for alerts
         window.onload = function() {
-            // Restore last active tab if exists
             const activeTab = localStorage.getItem('admin_active_tab') || 'dashboard';
             switchToPage(activeTab);
-
             initCharts();
-
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('success')) {
                 showAlert('alertContainer', urlParams.get('success'), 'success');

@@ -425,11 +425,12 @@ public class UserDAO {
     
     public List<Map<String, Object>> getWorkerEarnings(int workerId) {
         List<Map<String, Object>> earnings = new ArrayList<>();
-        String sql = "{CALL GetWorkerEarnings(?)}";
+        String sql = "SELECT DATE_FORMAT(w.created_at, '%Y-%m') AS month, COUNT(w.id) AS task_count, SUM(w.amount) AS total_amount " +
+                     "FROM wages w WHERE w.worker_id = ? GROUP BY DATE_FORMAT(w.created_at, '%Y-%m') ORDER BY month DESC";
         try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql)) {
-            cstmt.setInt(1, workerId);
-            ResultSet rs = cstmt.executeQuery();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, workerId);
+            ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> earning = new HashMap<>();
                 earning.put("month", rs.getString("month"));
@@ -498,6 +499,41 @@ public class UserDAO {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public double getAverageWorkerRating() {
+        String sql = "SELECT AVG(rating) FROM users WHERE role = 'worker' AND status = 'approved' AND rating > 0";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            if (rs.next()) return rs.getDouble(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public double getNetworkGrowth() {
+        // Growth in workers in the last 30 days
+        String totalSql = "SELECT COUNT(*) FROM users WHERE role = 'worker'";
+        String recentSql = "SELECT COUNT(*) FROM users WHERE role = 'worker' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+        try (Connection conn = DBConnection.getConnection()) {
+            int total = 0;
+            int recent = 0;
+            try (PreparedStatement pstmt = conn.prepareStatement(totalSql);
+                 ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) total = rs.getInt(1);
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(recentSql);
+                 ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) recent = rs.getInt(1);
+            }
+            if (total == 0) return 0;
+            return ((double) recent / (total > recent ? total - recent : 1)) * 100;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
     // ==================== HELPER METHODS ====================

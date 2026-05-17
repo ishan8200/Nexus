@@ -1624,7 +1624,7 @@ footer {
 
 .admin-card-body {
     padding: 2rem;
-    max-height: 500px;
+    max-height: 800px;
     overflow-y: auto;
 }
 

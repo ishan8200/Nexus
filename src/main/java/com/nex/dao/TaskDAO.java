@@ -66,7 +66,7 @@ public class TaskDAO {
         return null;
     }
     
-    public List<Map<String, Object>> getAllTasks(int adminId, String sortBy, String sortDir, String search) {
+    public List<Map<String, Object>> getAllTasks(int adminId, String filter, String sortBy, String sortDir, String search) {
         List<Map<String, Object>> tasks = new ArrayList<>();
         
         // Define allowed sort columns for security
@@ -80,7 +80,15 @@ public class TaskDAO {
         String orderBy = allowedCols.getOrDefault(sortBy, "t.created_at");
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         
-        StringBuilder sql = new StringBuilder("SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id WHERE t.created_by = ?");
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        
+        StringBuilder sql = new StringBuilder("SELECT t.*, u.full_name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id");
+        
+        if (onlyMine) {
+            sql.append(" WHERE t.created_by = ?");
+        } else {
+            sql.append(" WHERE 1=1");
+        }
         
         if (search != null && !search.trim().isEmpty()) {
             sql.append(" AND (t.title LIKE ? OR t.priority LIKE ? OR t.status LIKE ? OR t.category LIKE ? OR u.full_name LIKE ?)");
@@ -91,11 +99,15 @@ public class TaskDAO {
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
             
-            pstmt.setInt(1, adminId);
+            int paramIndex = 1;
+            if (onlyMine) {
+                pstmt.setInt(paramIndex++, adminId);
+            }
+            
             if (search != null && !search.trim().isEmpty()) {
                 String searchPattern = "%" + search.trim() + "%";
-                for (int i = 2; i <= 6; i++) {
-                    pstmt.setString(i, searchPattern);
+                for (int i = 0; i < 5; i++) {
+                    pstmt.setString(paramIndex++, searchPattern);
                 }
             }
             
@@ -114,6 +126,7 @@ public class TaskDAO {
                     task.put("estimated_hours", rs.getInt("estimated_hours"));
                     task.put("assignedToName", rs.getString("assigned_to_name"));
                     task.put("assigned_to", rs.getInt("assigned_to"));
+                    task.put("created_by", rs.getInt("created_by"));
                     tasks.add(task);
                 }
             }
@@ -121,6 +134,10 @@ public class TaskDAO {
             e.printStackTrace();
         }
         return tasks;
+    }
+
+    public List<Map<String, Object>> getAllTasks(int adminId, String sortBy, String sortDir, String search) {
+        return getAllTasks(adminId, "my", sortBy, sortDir, search);
     }
 
     public List<Map<String, Object>> getAllTasks(int adminId, String sortBy, String sortDir) {
@@ -256,14 +273,68 @@ public class TaskDAO {
     // ==================== TASK STATISTICS ====================
     
     public int getTaskCount(int adminId) {
-        return getTotalTaskCount(adminId);
+        return getTotalTaskCount(adminId, "my");
     }
 
-    public int getTotalTaskCount(int adminId) {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE created_by = ?";
+    public int getTotalTaskCount(int adminId, String filter) {
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT COUNT(*) FROM tasks" + (onlyMine ? " WHERE created_by = ?" : "");
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    public int getCompletedTaskCount(int adminId, String filter) {
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'completed'" + (onlyMine ? " AND created_by = ?" : "");
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    public int getOpenTaskCount(int adminId, String filter) {
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'open'" + (onlyMine ? " AND created_by = ?" : "");
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+    
+    public int getInProgressTaskCount(int adminId, String filter) {
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'in-progress'" + (onlyMine ? " AND created_by = ?" : "");
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) return rs.getInt(1);
             }
@@ -274,45 +345,19 @@ public class TaskDAO {
     }
     
     public int getCompletedTaskCount(int adminId) {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return getCompletedTaskCount(adminId, "my");
     }
-    
+
     public int getOpenTaskCount(int adminId) {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'open' AND created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return getOpenTaskCount(adminId, "my");
     }
-    
+
     public int getInProgressTaskCount(int adminId) {
-        String sql = "SELECT COUNT(*) FROM tasks WHERE status = 'in-progress' AND created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        return getInProgressTaskCount(adminId, "my");
+    }
+
+    public int getTotalTaskCount(int adminId) {
+        return getTotalTaskCount(adminId, "my");
     }
     
     // ==================== TASK SUBMISSIONS ====================
@@ -352,26 +397,94 @@ public class TaskDAO {
         return false;
     }
 
-    String sql = "{CALL ApproveTaskWork(?, ?, ?)}";
-    try (Connection conn = DBConnection.getConnection();
-         CallableStatement cstmt = conn.prepareCall(sql)) {
-        cstmt.setInt(1, assignmentId);
-        cstmt.setInt(2, rating);
-        cstmt.setString(3, comment);
-        
-        // Execute and check if successful
-        boolean hasResult = cstmt.execute();
-        // The stored procedure returns a result set with success field
-        if (hasResult) {
-            ResultSet rs = cstmt.getResultSet();
-            if (rs.next()) {
-                return rs.getInt("success") == 1;
+    Connection conn = null;
+    try {
+        conn = DBConnection.getConnection();
+        conn.setAutoCommit(false);
+
+        // 1. Get worker_id, task_id, and wage
+        int workerId = -1;
+        int taskId = -1;
+        double wage = 0;
+        String getDetailsSql = "SELECT ta.worker_id, ta.task_id, t.wage FROM task_assignments ta JOIN tasks t ON ta.task_id = t.id WHERE ta.id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(getDetailsSql)) {
+            pstmt.setInt(1, assignmentId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    workerId = rs.getInt("worker_id");
+                    taskId = rs.getInt("task_id");
+                    wage = rs.getDouble("wage");
+                } else {
+                    conn.rollback();
+                    return false;
+                }
             }
         }
-        return true; // If no result set, assume success if no exception
+
+        // 2. Update task_assignments
+        String updateAssignmentSql = "UPDATE task_assignments SET status = 'approved', quality_rating = ?, admin_feedback = ?, completed_at = NOW() WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(updateAssignmentSql)) {
+            pstmt.setInt(1, rating);
+            pstmt.setString(2, comment);
+            pstmt.setInt(3, assignmentId);
+            pstmt.executeUpdate();
+        }
+
+        // 3. Update task_submissions
+        String updateSubmissionSql = "UPDATE task_submissions SET status = 'approved' , reviewed_at = NOW(), reviewed_by = ? WHERE task_id = ? AND worker_id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(updateSubmissionSql)) {
+            pstmt.setInt(1, reviewedBy);
+            pstmt.setInt(2, taskId);
+            pstmt.setInt(3, workerId);
+            pstmt.executeUpdate();
+        }
+
+        // 4. Update task status
+        String updateTaskSql = "UPDATE tasks SET status = 'completed' WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(updateTaskSql)) {
+            pstmt.setInt(1, taskId);
+            pstmt.executeUpdate();
+        }
+
+        // 5. Update worker stats and rating
+        String updateWorkerSql = "UPDATE users SET tasks_completed = tasks_completed + 1, total_earned = total_earned + ?, rating = (rating * tasks_completed + ?) / (tasks_completed + 1) WHERE id = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(updateWorkerSql)) {
+            pstmt.setDouble(1, wage);
+            pstmt.setInt(2, rating);
+            pstmt.setInt(3, workerId);
+            pstmt.executeUpdate();
+        }
+
+        // 6. Create wage record
+        String insertWageSql = "INSERT INTO wages (worker_id, task_id, amount, status, created_at) VALUES (?, ?, ?, 'pending', NOW())";
+        try (PreparedStatement pstmt = conn.prepareStatement(insertWageSql)) {
+            pstmt.setInt(1, workerId);
+            pstmt.setInt(2, taskId);
+            pstmt.setDouble(3, wage);
+            pstmt.executeUpdate();
+        }
+
+        // 7. Create notification
+        String insertNotifSql = "INSERT INTO notifications (user_id, title, message, type, reference_id, reference_type) VALUES (?, 'Task Approved', ?, 'success', ?, 'task')";
+        try (PreparedStatement pstmt = conn.prepareStatement(insertNotifSql)) {
+            pstmt.setInt(1, workerId);
+            pstmt.setString(2, "Your work has been approved! Rating: " + rating + "/5");
+            pstmt.setInt(3, taskId);
+            pstmt.executeUpdate();
+        }
+
+        conn.commit();
+        return true;
     } catch (SQLException e) {
+        if (conn != null) {
+            try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+        }
         e.printStackTrace();
         return false;
+    } finally {
+        if (conn != null) {
+            try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+        }
     }
 }
     public boolean approveSubmission(int assignmentId, int reviewedBy, int rating, String comment) {
@@ -379,18 +492,56 @@ public class TaskDAO {
     }
     
     public boolean rejectSubmission(int assignmentId, int reviewedBy, String comment) {
-        String sql = "UPDATE task_assignments ta JOIN tasks t ON ta.task_id = t.id " +
-                     "SET ta.status = 'rejected', ta.admin_feedback = ?, ta.completed_at = NOW() " +
-                     "WHERE ta.id = ? AND ta.status = 'submitted' AND t.created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, comment);
-            pstmt.setInt(2, assignmentId);
-            pstmt.setInt(3, reviewedBy);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Get worker_id and task_id
+            int workerId = -1;
+            int taskId = -1;
+            String getIdsSql = "SELECT worker_id, task_id FROM task_assignments WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(getIdsSql)) {
+                pstmt.setInt(1, assignmentId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        workerId = rs.getInt("worker_id");
+                        taskId = rs.getInt("task_id");
+                    }
+                }
+            }
+
+            // 2. Update task_assignments
+            String updateAssignmentSql = "UPDATE task_assignments SET status = 'rejected', admin_feedback = ?, completed_at = NOW() WHERE id = ? AND status = 'submitted'";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateAssignmentSql)) {
+                pstmt.setString(1, comment);
+                pstmt.setInt(2, assignmentId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Update task_submissions
+            if (taskId != -1 && workerId != -1) {
+                String updateSubmissionSql = "UPDATE task_submissions SET status = 'rejected', reviewed_at = NOW(), reviewed_by = ? WHERE task_id = ? AND worker_id = ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(updateSubmissionSql)) {
+                    pstmt.setInt(1, reviewedBy);
+                    pstmt.setInt(2, taskId);
+                    pstmt.setInt(3, workerId);
+                    pstmt.executeUpdate();
+                }
+            }
+
+            conn.commit();
+            return true;
         } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
     }
     
@@ -498,17 +649,75 @@ public class TaskDAO {
     }
     
     public boolean assignTaskToWorker(int taskId, int workerId) {
-        String sql = "{CALL AssignTaskToWorker(?, ?)}";
-        try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql)) {
-            cstmt.setInt(1, taskId);
-            cstmt.setInt(2, workerId);
-            ResultSet rs = cstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("success") == 1;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Check if task exists and is open
+            String checkTaskSql = "SELECT title FROM tasks WHERE id = ? AND status = 'open' FOR UPDATE";
+            String taskTitle = null;
+            try (PreparedStatement pstmt = conn.prepareStatement(checkTaskSql)) {
+                pstmt.setInt(1, taskId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        taskTitle = rs.getString("title");
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
             }
+
+            // 2. Check if already assigned
+            String checkAssignedSql = "SELECT 1 FROM task_assignments WHERE task_id = ? AND worker_id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(checkAssignedSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.setInt(2, workerId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            // 3. Create assignment
+            String insertAssignmentSql = "INSERT INTO task_assignments (task_id, worker_id, status) VALUES (?, ?, 'accepted')";
+            try (PreparedStatement pstmt = conn.prepareStatement(insertAssignmentSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.setInt(2, workerId);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Update task status
+            String updateTaskSql = "UPDATE tasks SET status = 'in-progress', assigned_to = ? WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateTaskSql)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setInt(2, taskId);
+                pstmt.executeUpdate();
+            }
+
+            // 5. Create notification
+            String insertNotifSql = "INSERT INTO notifications (user_id, title, message, type, reference_id, reference_type) VALUES (?, 'New Task Assigned', ?, 'info', ?, 'task')";
+            try (PreparedStatement pstmt = conn.prepareStatement(insertNotifSql)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setString(2, "You have been assigned to: " + taskTitle);
+                pstmt.setInt(3, taskId);
+                pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
         } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
             e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
         return false;
     }
@@ -525,7 +734,7 @@ public class TaskDAO {
         String orderBy = allowedCols.getOrDefault(sortBy, "t.deadline");
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         
-        StringBuilder sql = new StringBuilder("SELECT ta.id as assignment_id, ta.status as assignment_status, t.* " +
+        StringBuilder sql = new StringBuilder("SELECT ta.id as assignment_id, ta.status as assignment_status, ta.admin_feedback, t.* " +
                      "FROM task_assignments ta " +
                      "JOIN tasks t ON ta.task_id = t.id " +
                      "WHERE ta.worker_id = ? AND ta.status NOT IN ('approved', 'cancelled')");
@@ -560,6 +769,7 @@ public class TaskDAO {
                     task.put("category", rs.getString("category"));
                     task.put("estimated_hours", rs.getInt("estimated_hours"));
                     task.put("assignment_status", rs.getString("assignment_status"));
+                    task.put("admin_feedback", rs.getString("admin_feedback"));
                     tasks.add(task);
                 }
             }
@@ -610,19 +820,81 @@ public class TaskDAO {
         }
     }
     public boolean submitTaskWork(int assignmentId, String submissionText, String attachmentPath, double hoursWorked) {
-        String sql = "{CALL SubmitTaskWork(?, ?, ?, ?)}";
-        try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql)) {
-            cstmt.setInt(1, assignmentId);
-            cstmt.setString(2, submissionText);
-            cstmt.setString(3, attachmentPath);
-            cstmt.setDouble(4, hoursWorked);
-            ResultSet rs = cstmt.executeQuery();
-            if (rs.next()) {
-                return rs.getInt("success") == 1;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Get worker_id and task_id
+            int workerId = -1;
+            int taskId = -1;
+            String getIdsSql = "SELECT worker_id, task_id FROM task_assignments WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(getIdsSql)) {
+                pstmt.setInt(1, assignmentId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        workerId = rs.getInt("worker_id");
+                        taskId = rs.getInt("task_id");
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
             }
+
+            // 2. Update task_assignments
+            String updateAssignmentSql = "UPDATE task_assignments SET status = 'submitted', submission_text = ?, attachment_path = ?, hours_worked = ?, submitted_at = NOW(), admin_feedback = NULL WHERE id = ? AND status IN ('accepted', 'in_progress', 'rejected')";
+            try (PreparedStatement pstmt = conn.prepareStatement(updateAssignmentSql)) {
+                pstmt.setString(1, submissionText);
+                pstmt.setString(2, attachmentPath);
+                pstmt.setDouble(3, hoursWorked);
+                pstmt.setInt(4, assignmentId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Insert/Update task_submissions
+            String upsertSubmissionSql = "INSERT INTO task_submissions (task_id, worker_id, submission_text, attachment_path, hours_worked, status, submitted_at) " +
+                                       "VALUES (?, ?, ?, ?, ?, 'pending', NOW()) " +
+                                       "ON DUPLICATE KEY UPDATE submission_text = VALUES(submission_text), attachment_path = VALUES(attachment_path), " +
+                                       "hours_worked = VALUES(hours_worked), status = 'pending', submitted_at = VALUES(submitted_at), " +
+                                       "reviewed_at = NULL, reviewed_by = NULL";
+            try (PreparedStatement pstmt = conn.prepareStatement(upsertSubmissionSql)) {
+                pstmt.setInt(1, taskId);
+                pstmt.setInt(2, workerId);
+                pstmt.setString(3, submissionText);
+                pstmt.setString(4, attachmentPath);
+                pstmt.setDouble(5, hoursWorked);
+                pstmt.executeUpdate();
+            }
+
+            // 4. Create notification for admin (assumed admin ID is 1 or find creator)
+            String getCreatorSql = "SELECT created_by FROM tasks WHERE id = ?";
+            int adminId = 1;
+            try (PreparedStatement pstmt = conn.prepareStatement(getCreatorSql)) {
+                pstmt.setInt(1, taskId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) adminId = rs.getInt("created_by");
+                }
+            }
+            String insertNotifSql = "INSERT INTO notifications (user_id, title, message, type, reference_id, reference_type) VALUES (?, 'Work Submitted', ?, 'info', ?, 'submission')";
+            try (PreparedStatement pstmt = conn.prepareStatement(insertNotifSql)) {
+                pstmt.setInt(1, adminId);
+                pstmt.setString(2, "Worker has submitted work for task ID: " + taskId);
+                pstmt.setInt(3, taskId);
+                pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
         } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
+            }
             e.printStackTrace();
+        } finally {
+            if (conn != null) {
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { e.printStackTrace(); }
+            }
         }
         return false;
     }
@@ -631,17 +903,24 @@ public class TaskDAO {
     
     public Map<String, Object> getAdminStats() {
         Map<String, Object> stats = new HashMap<>();
-        String sql = "{CALL GetAdminStats()}";
-        try (Connection conn = DBConnection.getConnection();
-             CallableStatement cstmt = conn.prepareCall(sql);
-             ResultSet rs = cstmt.executeQuery()) {
-            if (rs.next()) {
-                stats.put("total_tasks", rs.getInt("total_tasks"));
-                stats.put("completed_tasks", rs.getInt("completed_tasks"));
-                stats.put("active_workers", rs.getInt("active_workers"));
-                stats.put("wages_disbursed", rs.getDouble("wages_disbursed"));
-                stats.put("pending_workers", rs.getInt("pending_workers"));
-                stats.put("pending_submissions", rs.getInt("pending_submissions"));
+        try (Connection conn = DBConnection.getConnection()) {
+            String sql = "SELECT " +
+                        "(SELECT COUNT(*) FROM tasks) AS total_tasks, " +
+                        "(SELECT COUNT(*) FROM tasks WHERE status = 'completed') AS completed_tasks, " +
+                        "(SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'approved') AS active_workers, " +
+                        "(SELECT COALESCE(SUM(amount), 0) FROM wages WHERE status = 'paid') AS wages_disbursed, " +
+                        "(SELECT COUNT(*) FROM users WHERE role = 'worker' AND status = 'pending') AS pending_workers, " +
+                        "(SELECT COUNT(*) FROM task_submissions WHERE status = 'pending') AS pending_submissions";
+            try (PreparedStatement pstmt = conn.prepareStatement(sql);
+                 ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    stats.put("total_tasks", rs.getInt("total_tasks"));
+                    stats.put("completed_tasks", rs.getInt("completed_tasks"));
+                    stats.put("active_workers", rs.getInt("active_workers"));
+                    stats.put("wages_disbursed", rs.getDouble("wages_disbursed"));
+                    stats.put("pending_workers", rs.getInt("pending_workers"));
+                    stats.put("pending_submissions", rs.getInt("pending_submissions"));
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -649,17 +928,27 @@ public class TaskDAO {
         return stats;
     }
     
-    public List<Map<String, Object>> getTaskTrends(int adminId) {
+    public List<Map<String, Object>> getTaskTrends(int adminId, String filter) {
         List<Map<String, Object>> trends = new ArrayList<>();
-        String sql = "SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS date, " +
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        
+        StringBuilder sql = new StringBuilder("SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS date, " +
                      "COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed, " +
                      "COUNT(CASE WHEN status = 'open' THEN 1 END) AS open, " +
                      "COUNT(CASE WHEN status = 'in-progress' THEN 1 END) AS in_progress " +
-                     "FROM tasks WHERE created_by = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) " +
-                     "GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d') ORDER BY date DESC";
+                     "FROM tasks WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) ");
+        
+        if (onlyMine) {
+            sql.append(" AND created_by = ?");
+        }
+        
+        sql.append(" GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d') ORDER BY date DESC");
+        
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+             PreparedStatement pstmt = conn.prepareStatement(sql.toString())) {
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> trend = new HashMap<>();
@@ -675,12 +964,19 @@ public class TaskDAO {
         return trends;
     }
 
-    public List<Map<String, Object>> getTasksByCategory(int adminId) {
+    public List<Map<String, Object>> getTaskTrends(int adminId) {
+        return getTaskTrends(adminId, "my");
+    }
+
+    public List<Map<String, Object>> getTasksByCategory(int adminId, String filter) {
         List<Map<String, Object>> categories = new ArrayList<>();
-        String sql = "SELECT category, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY category";
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT category, COUNT(*) as count FROM tasks" + (onlyMine ? " WHERE created_by = ?" : "") + " GROUP BY category";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> cat = new HashMap<>();
@@ -694,12 +990,19 @@ public class TaskDAO {
         return categories;
     }
 
-    public List<Map<String, Object>> getTasksByPriority(int adminId) {
+    public List<Map<String, Object>> getTasksByCategory(int adminId) {
+        return getTasksByCategory(adminId, "my");
+    }
+
+    public List<Map<String, Object>> getTasksByPriority(int adminId, String filter) {
         List<Map<String, Object>> priorities = new ArrayList<>();
-        String sql = "SELECT priority, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY priority";
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT priority, COUNT(*) as count FROM tasks" + (onlyMine ? " WHERE created_by = ?" : "") + " GROUP BY priority";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> p = new HashMap<>();
@@ -713,12 +1016,19 @@ public class TaskDAO {
         return priorities;
     }
 
-    public List<Map<String, Object>> getTasksByStatus(int adminId) {
+    public List<Map<String, Object>> getTasksByPriority(int adminId) {
+        return getTasksByPriority(adminId, "my");
+    }
+
+    public List<Map<String, Object>> getTasksByStatus(int adminId, String filter) {
         List<Map<String, Object>> statuses = new ArrayList<>();
-        String sql = "SELECT status, COUNT(*) as count FROM tasks WHERE created_by = ? GROUP BY status";
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT status, COUNT(*) as count FROM tasks" + (onlyMine ? " WHERE created_by = ?" : "") + " GROUP BY status";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 Map<String, Object> s = new HashMap<>();
@@ -730,6 +1040,10 @@ public class TaskDAO {
             e.printStackTrace();
         }
         return statuses;
+    }
+
+    public List<Map<String, Object>> getTasksByStatus(int adminId) {
+        return getTasksByStatus(adminId, "my");
     }
     
     // ==================== HELPER METHODS ====================
@@ -791,7 +1105,7 @@ public List<Map<String, Object>> getWorkerRatings(int workerId) {
         String orderBy = allowedCols.getOrDefault(sortBy, "ta.completed_at");
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         
-        StringBuilder sql = new StringBuilder("SELECT t.title, t.wage, t.status as task_status, ta.quality_rating as rating, ta.admin_feedback as rating_comment, ta.completed_at as reviewed_at " +
+        StringBuilder sql = new StringBuilder("SELECT t.title, t.wage, t.status as task_status, ta.quality_rating as rating, ta.admin_feedback, ta.completed_at as reviewed_at " +
                      "FROM tasks t " +
                      "JOIN task_assignments ta ON t.id = ta.task_id " +
                      "WHERE ta.worker_id = ? AND t.status = 'completed' AND ta.status = 'approved'");
@@ -816,7 +1130,7 @@ public List<Map<String, Object>> getWorkerRatings(int workerId) {
                     record.put("title", rs.getString("title"));
                     record.put("wage", rs.getDouble("wage"));
                     record.put("rating", rs.getInt("rating"));
-                    record.put("comment", rs.getString("rating_comment"));
+                    record.put("comment", rs.getString("admin_feedback"));
                     record.put("date", rs.getTimestamp("reviewed_at") != null ? rs.getTimestamp("reviewed_at").toString() : "");
                     performance.add(record);
                 }

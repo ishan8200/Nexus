@@ -196,10 +196,9 @@
                     <span class="nav-text">Notifications</span>
                     <% 
                         List<Map<String, Object>> notifs = (List<Map<String, Object>>) request.getAttribute("notifications");
-                        long unreadCount = notifs != null ? notifs.stream().filter(n -> !(boolean)n.get("is_read")).count() : 0;
-                        if (unreadCount > 0) {
+                        if (notifs != null && !notifs.isEmpty()) {
                     %>
-                    <span class="nav-badge"><%= unreadCount %></span>
+                    <span class="nav-badge"><%= notifs.size() %></span>
                     <% } %>
                 </a>
                 <a href="javascript:void(0)" class="nav-item" onclick="switchToPage('available-tasks')">
@@ -835,7 +834,7 @@
                     <div class="admin-card-body">
                         <% if (notifs != null && !notifs.isEmpty()) { %>
                             <% for (Map<String, Object> n : notifs) { %>
-                                <div class="notification-item" style="padding: 15px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px; background: <%= (boolean)n.get("is_read") ? "transparent" : "rgba(59, 130, 246, 0.03)" %>;">
+                                <div class="notification-item" style="padding: 15px; border-bottom: 1px solid var(--nexus-border); display: flex; gap: 15px;">
                                     <div class="notification-icon" style="font-size: 18px;">
                                         <% if ("success".equals(n.get("type"))) { %>
                                             <i class="fas fa-check-circle" style="color: var(--nexus-success);"></i>
@@ -1122,6 +1121,9 @@
                         const statusBadge = row.querySelector('.status-badge');
                         statusBadge.className = 'status-badge in-progress';
                         statusBadge.textContent = 'IN_PROGRESS';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
                         // Change button to submit button with proper escaping and DOM-based title retrieval
                         btn.outerHTML = `<button onclick="openSubmitModal('\${assignmentId}', this.closest('tr').cells[0].textContent.trim())" class="btn btn-secondary" style="padding: 5px 12px; font-size: 11px; background: var(--nexus-success); color: white; border: none;">Submit Work</button>`;
                     } else if (err) {
@@ -1131,35 +1133,6 @@
             }).catch(error => {
                 console.error('Error:', error);
                 showAlert('alertContainer', 'Network error occurred', 'error');
-            });
-        }
-
-        function submitWork(event) {
-            event.preventDefault();
-            const form = event.target;
-            const formData = new URLSearchParams(new FormData(form));
-            
-            fetch(form.action, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString()
-            }).then(response => {
-                if (response.redirected) {
-                    const url = new URL(response.url);
-                    const msg = url.searchParams.get('success');
-                    if (msg) {
-                        showAlert('alertContainer', msg, 'success');
-                        closeSubmitModal();
-                        const aId = document.getElementById('modalAssignmentId').value;
-                        const row = document.querySelector(`button[onclick*="'\${aId}'"]`)?.closest('tr');
-                        if (row) {
-                            const statusBadge = row.querySelector('.status-badge');
-                            statusBadge.className = 'status-badge submitted';
-                            statusBadge.textContent = 'SUBMITTED';
-                            row.cells[4].innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Awaiting Review</span>';
-                        }
-                    }
-                }
             });
         }
 

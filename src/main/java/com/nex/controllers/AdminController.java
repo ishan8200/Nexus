@@ -108,25 +108,38 @@ public class AdminController extends HttpServlet {
         String workerSearch = request.getParameter("workerSearch");
         String wageSearch = request.getParameter("wageSearch");
         String paymentSearch = request.getParameter("paymentSearch");
+        
+        // Get filter parameters
+        String taskFilter = request.getParameter("taskFilter");
+        if (taskFilter == null) taskFilter = "my";
+        
+        String analyticsFilter = request.getParameter("analyticsFilter");
+        if (analyticsFilter == null) analyticsFilter = "my";
 
-        int totalTasks = taskDAO.getTaskCount(currentUser.getId());
-        int completedTasks = taskDAO.getCompletedTaskCount(currentUser.getId());
+        int totalTasks = taskDAO.getTotalTaskCount(currentUser.getId(), analyticsFilter);
+        int completedTasks = taskDAO.getCompletedTaskCount(currentUser.getId(), analyticsFilter);
         int activeWorkers = userDAO.getActiveWorkerCount();
-        double wagesDisbursed = wageDAO.getTotalWagesPaid(currentUser.getId());
+        double wagesDisbursed = wageDAO.getTotalWagesDisbursed(currentUser.getId(), analyticsFilter);
         int pendingSubmissions = taskDAO.getPendingSubmissionCount(currentUser.getId());
+        
+        // Performance Nodes
+        double avgRating = userDAO.getAverageWorkerRating();
+        double taskEfficiency = (totalTasks > 0) ? ((double) completedTasks / totalTasks * 100) : 0;
+        double networkGrowth = userDAO.getNetworkGrowth();
+        double systemHealth = 100.0; // Assume 100% health for now
 
         List<Map<String, Object>> recentTasks = taskDAO.getRecentTasks(5, currentUser.getId());
         List<User> pendingWorkersList = userDAO.getPendingWorkersList();
         List<Map<String, Object>> pendingSubmissionsList = taskDAO.getPendingSubmissionsList(currentUser.getId());
         List<User> allWorkers = userDAO.getAllWorkers(workerSortBy, workerSortDir, workerSearch);
-        List<Map<String, Object>> allTasks = taskDAO.getAllTasks(currentUser.getId(), taskSortBy, taskSortDir, taskSearch);
+        List<Map<String, Object>> allTasks = taskDAO.getAllTasks(currentUser.getId(), taskFilter, taskSortBy, taskSortDir, taskSearch);
         List<Map<String, Object>> wageSummary = wageDAO.getWageSummary(currentUser.getId());
         List<Map<String, Object>> pendingWages = wageDAO.getPendingWagesWithDetails(currentUser.getId(), wageSortBy, wageSortDir, wageSearch);
         List<Map<String, Object>> paidWages = wageDAO.getPaidWagesWithDetails(currentUser.getId(), paymentSortBy, paymentSortDir, paymentSearch);
-        List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends(currentUser.getId());
-        List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory(currentUser.getId());
-        List<Map<String, Object>> tasksByPriority = taskDAO.getTasksByPriority(currentUser.getId());
-        List<Map<String, Object>> tasksByStatus = taskDAO.getTasksByStatus(currentUser.getId());
+        List<Map<String, Object>> taskTrends = taskDAO.getTaskTrends(currentUser.getId(), analyticsFilter);
+        List<Map<String, Object>> tasksByCategory = taskDAO.getTasksByCategory(currentUser.getId(), analyticsFilter);
+        List<Map<String, Object>> tasksByPriority = taskDAO.getTasksByPriority(currentUser.getId(), analyticsFilter);
+        List<Map<String, Object>> tasksByStatus = taskDAO.getTasksByStatus(currentUser.getId(), analyticsFilter);
         
         // CMS Settings
         java.util.Map<String, String> siteSettings = settingsDAO.getAllSettings();
@@ -136,6 +149,12 @@ public class AdminController extends HttpServlet {
         request.setAttribute("activeWorkers", activeWorkers);
         request.setAttribute("wagesDisbursed", wagesDisbursed);
         request.setAttribute("pendingSubmissions", pendingSubmissions);
+        
+        request.setAttribute("avgRating", avgRating);
+        request.setAttribute("taskEfficiency", taskEfficiency);
+        request.setAttribute("networkGrowth", networkGrowth);
+        request.setAttribute("systemHealth", systemHealth);
+
         request.setAttribute("recentTasks", recentTasks);
         request.setAttribute("pendingWorkersList", pendingWorkersList);
         request.setAttribute("pendingSubmissionsList", pendingSubmissionsList);
@@ -151,7 +170,7 @@ public class AdminController extends HttpServlet {
         request.setAttribute("siteSettings", siteSettings);
         request.setAttribute("currentUser", currentUser);
         
-        // Preserve sort and search parameters
+        // Preserve sort, search and filter parameters
         request.setAttribute("taskSortBy", taskSortBy);
         request.setAttribute("taskSortDir", taskSortDir);
         request.setAttribute("workerSortBy", workerSortBy);
@@ -164,6 +183,8 @@ public class AdminController extends HttpServlet {
         request.setAttribute("workerSearch", workerSearch);
         request.setAttribute("wageSearch", wageSearch);
         request.setAttribute("paymentSearch", paymentSearch);
+        request.setAttribute("taskFilter", taskFilter);
+        request.setAttribute("analyticsFilter", analyticsFilter);
         
         request.getRequestDispatcher("/WEB-INF/pages/adminDash.jsp").forward(request, response);
     }

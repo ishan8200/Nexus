@@ -50,9 +50,20 @@ public class ApproveSubmissionServlet extends HttpServlet {
             String action = request.getParameter("action");
             
             if ("approve".equals(action)) {
+                // Get rating from request, default to 5 if not provided
+                int rating = 5;
+                String ratingParam = request.getParameter("rating");
+                if (ratingParam != null && !ratingParam.isEmpty()) {
+                    rating = Integer.parseInt(ratingParam);
+                }
+                
+                String comment = request.getParameter("comment");
+                if (comment == null || comment.isEmpty()) {
+                    comment = "Approved via Admin Dashboard";
+                }
+
                 // Mark as approved, update task status, and create wage record
-                // We use a default rating of 5 for now
-                boolean success = taskDAO.processSubmissionApproval(submissionId, currentUser.getId(), 5, "Approved via Admin Dashboard");
+                boolean success = taskDAO.processSubmissionApproval(submissionId, currentUser.getId(), rating, comment);
                 
                 if (success) {
                     out.print("{\"success\": true, \"message\": \"Submission approved and payment recorded!\"}");

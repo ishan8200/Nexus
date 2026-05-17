@@ -81,14 +81,17 @@ public class WageDAO {
     }
     
     public double getTotalWagesPaid(int adminId) {
-        return getTotalWagesDisbursed(adminId);
+        return getTotalWagesDisbursed(adminId, "my");
     }
 
-    public double getTotalWagesDisbursed(int adminId) {
-        String sql = "SELECT COALESCE(SUM(w.amount), 0) FROM wages w JOIN tasks t ON w.task_id = t.id WHERE w.status = 'paid' AND t.created_by = ?";
+    public double getTotalWagesDisbursed(int adminId, String filter) {
+        boolean onlyMine = !"all".equalsIgnoreCase(filter);
+        String sql = "SELECT COALESCE(SUM(w.amount), 0) FROM wages w JOIN tasks t ON w.task_id = t.id WHERE w.status = 'paid'" + (onlyMine ? " AND t.created_by = ?" : "");
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, adminId);
+            if (onlyMine) {
+                pstmt.setInt(1, adminId);
+            }
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) return rs.getDouble(1);
             }
@@ -96,6 +99,10 @@ public class WageDAO {
             e.printStackTrace();
         }
         return 0;
+    }
+    
+    public double getTotalWagesDisbursed(int adminId) {
+        return getTotalWagesDisbursed(adminId, "my");
     }
     
     public double getPendingWagesTotal(int adminId) {

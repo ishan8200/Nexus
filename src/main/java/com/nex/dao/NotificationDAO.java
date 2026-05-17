@@ -23,7 +23,6 @@ public class NotificationDAO {
                     n.put("title", rs.getString("title"));
                     n.put("message", rs.getString("message"));
                     n.put("type", rs.getString("type"));
-                    n.put("is_read", rs.getBoolean("is_read"));
                     n.put("created_at", rs.getTimestamp("created_at"));
                     notifications.add(n);
                 }
@@ -35,15 +34,8 @@ public class NotificationDAO {
     }
 
     public boolean markAsRead(int notificationId) {
-        String sql = "UPDATE notifications SET is_read = 1, read_at = NOW() WHERE id = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, notificationId);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+        // Method disabled as is_read column is missing in schema
+        return true;
     }
 
     public boolean createNotification(Notification notification) {
