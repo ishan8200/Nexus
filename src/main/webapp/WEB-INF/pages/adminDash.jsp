@@ -530,7 +530,7 @@
                                                 <strong><%= task.get("title") %></strong>
                                                 <div style="margin-top: 4px;">
                                                     <a href="javascript:void(0)" 
-                                                       onclick="viewTaskDescription('<%= task.get("title").toString().replace("'", "\\'") %>', '<%= task.get("description") != null ? task.get("description").toString().replace("'", "\\'").replace("\n", " ").replace("\r", "") : "No description provided." %>')" 
+                                                       onclick="viewTaskDescription('<%= task.get("title").toString().replace("'", "\\'") %>', '<%= task.get("description") != null ? task.get("description").toString().replace("'", "\\'").replace("\n", " ").replace("\r", "") : "No description provided." %>', '<%= task.get("wage_type") != null ? task.get("wage_type").toString().substring(0, 1).toUpperCase() + task.get("wage_type").toString().substring(1) : "Fixed" %>')" 
                                                        style="font-size: 10px; color: var(--nexus-accent); text-decoration: none; display: flex; align-items: center; gap: 4px;">
                                                         <i class="fas fa-eye"></i> View Details
                                                     </a>
@@ -610,6 +610,11 @@
                                         <option value="Data Entry">Data Entry</option>
                                         <option value="QA">QA</option>
                                         <option value="Administrative">Administrative</option>
+                                        <option value="Writing & Translation">Writing & Translation</option>
+                                        <option value="Customer Service">Customer Service</option>
+                                        <option value="Business & Finance">Business & Finance</option>
+                                        <option value="AI & Machine Learning">AI & Machine Learning</option>
+                                        <option value="Media & Production">Media & Production</option>
                                         <option value="General">General</option>
                                     </select>
                                 </div>
@@ -628,7 +633,7 @@
                                     <input type="number" class="input-field" name="estimatedHours" placeholder="e.g. 10" min="0">
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Wage Model</label>
+                                    <label class="form-label">Payment Type</label>
                                     <select class="select-field" name="wageType">
                                         <option value="fixed">Fixed Rate</option>
                                         <option value="hourly">Hourly Velocity</option>
@@ -1226,6 +1231,11 @@
                                 <option value="Data Entry">Data Entry</option>
                                 <option value="QA">QA</option>
                                 <option value="Administrative">Administrative</option>
+                                <option value="Writing & Translation">Writing & Translation</option>
+                                <option value="Customer Service">Customer Service</option>
+                                <option value="Business & Finance">Business & Finance</option>
+                                <option value="AI & Machine Learning">AI & Machine Learning</option>
+                                <option value="Media & Production">Media & Production</option>
                                 <option value="General">General</option>
                             </select>
                         </div>
@@ -1283,6 +1293,11 @@
                 <button class="modal-close" onclick="closeTaskDescriptionModal()">&times;</button>
             </div>
             <div class="modal-body">
+                <div id="descModalWageTypeContainer" style="margin-bottom: 15px;">
+                    <span class="status-badge" style="background: var(--nexus-accent-light); color: var(--nexus-accent); border: 1px solid rgba(59, 130, 246, 0.2); font-weight: 700;">
+                        <i class="fas fa-wallet" style="margin-right: 5px;"></i> Payment Type: <span id="descModalWageType"></span>
+                    </span>
+                </div>
                 <div style="padding: 20px; background: var(--nexus-surface); border: 1px solid var(--nexus-border); border-radius: var(--radius-md); line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap;" id="descModalContent">
                 </div>
             </div>
@@ -1293,9 +1308,10 @@
     </div>
 
     <script>
-        function viewTaskDescription(title, description) {
+        function viewTaskDescription(title, description, wageType) {
             document.getElementById('descModalTitle').textContent = title;
             document.getElementById('descModalContent').textContent = description;
+            document.getElementById('descModalWageType').textContent = wageType || 'Fixed';
             document.getElementById('taskDescriptionModal').classList.add('active');
         }
 

@@ -17,7 +17,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 @WebServlet("/worker")
-public class WorkerController extends HttpServlet {
+public class WorkerServlet extends HttpServlet {
     
     private static final long serialVersionUID = 1L;
     private TaskDAO taskDAO;
@@ -77,6 +77,8 @@ public class WorkerController extends HttpServlet {
         
         com.nex.dao.WageDAO wageDAO = new com.nex.dao.WageDAO();
         List<Map<String, Object>> earningsHistory = wageDAO.getWorkerEarnings(currentUser.getId(), earnSortBy, earnSortDir);
+        List<Map<String, Object>> detailedEarnings = wageDAO.getDetailedEarnings(currentUser.getId());
+        List<Map<String, Object>> paymentHistory = wageDAO.getPaymentHistory(currentUser.getId());
         
         List<Map<String, Object>> notifications = notificationDAO.getNotificationsForUser(currentUser.getId());
         List<Skill> allSkills = skillDAO.getAllSkills();
@@ -94,6 +96,8 @@ public class WorkerController extends HttpServlet {
 
         request.setAttribute("myTasks", myTasks);
         request.setAttribute("earningsHistory", earningsHistory);
+        request.setAttribute("detailedEarnings", detailedEarnings);
+        request.setAttribute("paymentHistory", paymentHistory);
         request.setAttribute("notifications", notifications);
         request.setAttribute("allSkills", allSkills);
         request.setAttribute("workerSkills", workerSkills);

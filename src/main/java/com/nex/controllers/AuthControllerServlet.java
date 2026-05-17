@@ -15,7 +15,7 @@ import jakarta.servlet.http.*;
  * This satisfies the "Two Controllers" requirement.
  */
 @WebServlet({"/login", "/register", "/logout", "/forgot-password"})
-public class AuthController extends HttpServlet {
+public class AuthControllerServlet extends HttpServlet {
     
     private static final long serialVersionUID = 1L;
     private UserDAO userDao;

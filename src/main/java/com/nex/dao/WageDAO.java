@@ -46,37 +46,114 @@ public class WageDAO {
     }
     
     public boolean markAsPaid(int wageId, int paidBy, String transactionId, String paymentMethod) {
-        String sql = "UPDATE wages w JOIN tasks t ON w.task_id = t.id " +
-                     "SET w.status = 'paid', w.paid_at = NOW(), w.paid_by = ?, w.transaction_id = ?, w.payment_method = ? " +
-                     "WHERE w.id = ? AND t.created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, paidBy);
-            pstmt.setString(2, transactionId);
-            pstmt.setString(3, paymentMethod);
-            pstmt.setInt(4, wageId);
-            pstmt.setInt(5, paidBy);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Get wage details
+            int workerId = -1;
+            double amount = 0;
+            String sqlGet = "SELECT w.worker_id, w.amount FROM wages w JOIN tasks t ON w.task_id = t.id WHERE w.id = ? AND t.created_by = ? AND w.status = 'pending'";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlGet)) {
+                pstmt.setInt(1, wageId);
+                pstmt.setInt(2, paidBy);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        workerId = rs.getInt("worker_id");
+                        amount = rs.getDouble("amount");
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+            }
+
+            // 2. Update wage record
+            String sqlUpdate = "UPDATE wages SET status = 'paid', paid_at = NOW(), paid_by = ?, transaction_id = ?, payment_method = ? WHERE id = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUpdate)) {
+                pstmt.setInt(1, paidBy);
+                pstmt.setString(2, transactionId);
+                pstmt.setString(3, paymentMethod);
+                pstmt.setInt(4, wageId);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Insert into payment_history
+            String sqlHistory = "INSERT INTO payment_history (worker_id, amount, payment_date, payment_method, transaction_id, status) VALUES (?, ?, CURDATE(), ?, ?, 'completed')";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlHistory)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setDouble(2, amount);
+                pstmt.setString(3, paymentMethod);
+                pstmt.setString(4, transactionId);
+                pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
         } catch (SQLException e) {
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ex) {}
         }
     }
     
     public boolean markWorkerWagesAsPaid(int workerId, int paidBy, String transactionId) {
-        String sql = "UPDATE wages w JOIN tasks t ON w.task_id = t.id " +
-                     "SET w.status = 'paid', w.paid_at = NOW(), w.paid_by = ?, w.transaction_id = ? " +
-                     "WHERE w.worker_id = ? AND w.status = 'pending' AND t.created_by = ?";
-        try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, paidBy);
-            pstmt.setString(2, transactionId);
-            pstmt.setInt(3, workerId);
-            pstmt.setInt(4, paidBy);
-            return pstmt.executeUpdate() > 0;
+        Connection conn = null;
+        try {
+            conn = DBConnection.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1. Get total pending amount for this worker and admin
+            double totalAmount = 0;
+            String sqlGet = "SELECT COALESCE(SUM(w.amount), 0) FROM wages w JOIN tasks t ON w.task_id = t.id " +
+                            "WHERE w.worker_id = ? AND w.status = 'pending' AND t.created_by = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlGet)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setInt(2, paidBy);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        totalAmount = rs.getDouble(1);
+                    }
+                }
+            }
+
+            if (totalAmount <= 0) {
+                conn.rollback();
+                return false;
+            }
+
+            // 2. Update all pending wages
+            String sqlUpdate = "UPDATE wages w JOIN tasks t ON w.task_id = t.id " +
+                               "SET w.status = 'paid', w.paid_at = NOW(), w.paid_by = ?, w.transaction_id = ?, w.payment_method = 'Batch Transfer' " +
+                               "WHERE w.worker_id = ? AND w.status = 'pending' AND t.created_by = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlUpdate)) {
+                pstmt.setInt(1, paidBy);
+                pstmt.setString(2, transactionId);
+                pstmt.setInt(3, workerId);
+                pstmt.setInt(4, paidBy);
+                pstmt.executeUpdate();
+            }
+
+            // 3. Add to payment history as a batch entry
+            String sqlHistory = "INSERT INTO payment_history (worker_id, amount, payment_date, payment_method, transaction_id, status) VALUES (?, ?, CURDATE(), 'Batch Transfer', ?, 'completed')";
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlHistory)) {
+                pstmt.setInt(1, workerId);
+                pstmt.setDouble(2, totalAmount);
+                pstmt.setString(3, transactionId);
+                pstmt.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
         } catch (SQLException e) {
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
             e.printStackTrace();
             return false;
+        } finally {
+            if (conn != null) try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ex) {}
         }
     }
     
@@ -368,6 +445,36 @@ public class WageDAO {
     
     // ==================== HELPER METHODS ====================
     
+    public List<Map<String, Object>> getDetailedEarnings(int workerId) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        String sql = "SELECT w.id, t.title, t.wage as rate, t.wage_type, ta.hours_worked, w.amount as total, w.status, w.created_at " +
+                     "FROM wages w " +
+                     "JOIN tasks t ON w.task_id = t.id " +
+                     "JOIN task_assignments ta ON (ta.task_id = t.id AND ta.worker_id = w.worker_id) " +
+                     "WHERE w.worker_id = ? " +
+                     "ORDER BY w.created_at DESC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, workerId);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", rs.getInt("id"));
+                map.put("title", rs.getString("title"));
+                map.put("rate", rs.getDouble("rate"));
+                map.put("wage_type", rs.getString("wage_type"));
+                map.put("hours_worked", rs.getDouble("hours_worked"));
+                map.put("total", rs.getDouble("total"));
+                map.put("status", rs.getString("status"));
+                map.put("created_at", rs.getTimestamp("created_at"));
+                list.add(map);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
     public List<Map<String, Object>> getWorkerEarnings(int workerId, String sortBy, String sortDir) {
         List<Map<String, Object>> earnings = new ArrayList<>();
         

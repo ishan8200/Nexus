@@ -18,7 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 @WebServlet({"/admin", "/admin/update-settings"})
-public class AdminController extends HttpServlet {
+public class AdminServlet extends HttpServlet {
     
     private static final long serialVersionUID = 1L;
     private TaskDAO taskDAO;

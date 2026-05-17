@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.nex.dao.SettingsDAO;
 
 @WebServlet("/about")
-public class AboutController extends HttpServlet {
+public class AboutServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private SettingsDAO settingsDAO;
 

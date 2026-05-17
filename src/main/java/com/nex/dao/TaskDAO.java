@@ -402,11 +402,15 @@ public class TaskDAO {
         conn = DBConnection.getConnection();
         conn.setAutoCommit(false);
 
-        // 1. Get worker_id, task_id, and wage
+        // 1. Get worker_id, task_id, wage, wage_type and hours_worked
         int workerId = -1;
         int taskId = -1;
         double wage = 0;
-        String getDetailsSql = "SELECT ta.worker_id, ta.task_id, t.wage FROM task_assignments ta JOIN tasks t ON ta.task_id = t.id WHERE ta.id = ?";
+        String wageType = "fixed";
+        double hoursWorked = 0;
+        
+        String getDetailsSql = "SELECT ta.worker_id, ta.task_id, t.wage, t.wage_type, ta.hours_worked " +
+                               "FROM task_assignments ta JOIN tasks t ON ta.task_id = t.id WHERE ta.id = ?";
         try (PreparedStatement pstmt = conn.prepareStatement(getDetailsSql)) {
             pstmt.setInt(1, assignmentId);
             try (ResultSet rs = pstmt.executeQuery()) {
@@ -414,11 +418,19 @@ public class TaskDAO {
                     workerId = rs.getInt("worker_id");
                     taskId = rs.getInt("task_id");
                     wage = rs.getDouble("wage");
+                    wageType = rs.getString("wage_type");
+                    hoursWorked = rs.getDouble("hours_worked");
                 } else {
                     conn.rollback();
                     return false;
                 }
             }
+        }
+
+        // Calculate final payment based on wage type
+        double finalWage = wage;
+        if ("hourly".equalsIgnoreCase(wageType)) {
+            finalWage = wage * hoursWorked;
         }
 
         // 2. Update task_assignments
@@ -447,9 +459,13 @@ public class TaskDAO {
         }
 
         // 5. Update worker stats and rating
-        String updateWorkerSql = "UPDATE users SET tasks_completed = tasks_completed + 1, total_earned = total_earned + ?, rating = (rating * tasks_completed + ?) / (tasks_completed + 1) WHERE id = ?";
+        // Note: tasks_completed is incremented by a DB trigger when task status becomes 'completed' (Step 4)
+        // We use (tasks_completed - 1) to get the count before the current task for rating averaging.
+        String updateWorkerSql = "UPDATE users SET total_earned = total_earned + ?, " +
+                                 "rating = (rating * (tasks_completed - 1) + ?) / tasks_completed " +
+                                 "WHERE id = ?";
         try (PreparedStatement pstmt = conn.prepareStatement(updateWorkerSql)) {
-            pstmt.setDouble(1, wage);
+            pstmt.setDouble(1, finalWage);
             pstmt.setInt(2, rating);
             pstmt.setInt(3, workerId);
             pstmt.executeUpdate();
@@ -460,7 +476,7 @@ public class TaskDAO {
         try (PreparedStatement pstmt = conn.prepareStatement(insertWageSql)) {
             pstmt.setInt(1, workerId);
             pstmt.setInt(2, taskId);
-            pstmt.setDouble(3, wage);
+            pstmt.setDouble(3, finalWage);
             pstmt.executeUpdate();
         }
 

@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.nex.dao.SettingsDAO;
 
 @WebServlet("/contact")
-public class ContactController extends HttpServlet {
+public class ContactServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private SettingsDAO settingsDAO;
 

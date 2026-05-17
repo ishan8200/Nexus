@@ -11,6 +11,8 @@
     List<Map<String, Object>> availableTasks = (List<Map<String, Object>>) request.getAttribute("availableTasks");
     List<Map<String, Object>> myTasks = (List<Map<String, Object>>) request.getAttribute("myTasks");
     List<Map<String, Object>> earningsHistory = (List<Map<String, Object>>) request.getAttribute("earningsHistory");
+    List<Map<String, Object>> detailedEarnings = (List<Map<String, Object>>) request.getAttribute("detailedEarnings");
+    List<Map<String, Object>> paymentHistory = (List<Map<String, Object>>) request.getAttribute("paymentHistory");
     List<Skill> allSkills = (List<Skill>) request.getAttribute("allSkills");
     List<Skill> workerSkills = (List<Skill>) request.getAttribute("workerSkills");
     List<Map<String, Object>> performance = (List<Map<String, Object>>) request.getAttribute("performance");
@@ -747,6 +749,78 @@
                         <% } %>
                     </div>
                 </div>
+
+                <div class="admin-card" style="margin-top: 30px;">
+                    <div class="admin-card-header">
+                        <h3><i class="fas fa-list-ul" style="color: var(--nexus-accent); margin-right: 8px;"></i>Detailed Task Earnings</h3>
+                    </div>
+                    <div class="admin-card-body">
+                        <% if (detailedEarnings != null && !detailedEarnings.isEmpty()) { %>
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Task Title</th>
+                                        <th>Wage/Rate</th>
+                                        <th>Type</th>
+                                        <th>Hours</th>
+                                        <th>Total Paid</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% for (Map<String, Object> earn : detailedEarnings) { %>
+                                        <tr>
+                                            <td style="font-weight: 600;"><%= earn.get("title") %></td>
+                                            <td style="font-family: 'JetBrains Mono';"><%= cur.format(earn.get("rate")) %></td>
+                                            <td>
+                                                <span class="status-badge" style="background: var(--nexus-surface); color: var(--text-primary); border: 1px solid var(--nexus-border);">
+                                                    <%= earn.get("wage_type").toString().toUpperCase() %>
+                                                </span>
+                                            </td>
+                                            <td><%= earn.get("hours_worked") %>h</td>
+                                            <td style="font-family: 'JetBrains Mono'; font-weight: 700; color: var(--nexus-success);">
+                                                <%= cur.format(earn.get("total")) %>
+                                            </td>
+                                            <td>
+                                                <% String status = earn.get("status").toString(); %>
+                                                <span class="status-badge <%= status.toLowerCase() %>">
+                                                    <%= status.toUpperCase() %>
+                                                </span>
+                                            </td>
+                                            <td style="font-size: 12px; color: var(--text-muted);"><%= earn.get("created_at") %></td>
+                                        </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        <% } else { %>
+                            <div style="padding: 60px; text-align: center;">
+                                <p style="color: var(--text-muted);">No task earnings found.</p>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+
+                
+                <!-- Footer (Visible only in Earnings) -->
+                <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--nexus-border);">
+                    <div class="footer-content" style="max-width: 100%; padding: 0;">
+                        <div class="footer-brand">
+                            <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
+                        </div>
+                        <div class="footer-links" style="gap: 20px;">
+                            <a href="${pageContext.request.contextPath}/">Home</a>
+                            <a href="${pageContext.request.contextPath}/about">About</a>
+                            <a href="${pageContext.request.contextPath}/contact">Contact</a>
+                        </div>
+                        <div class="footer-socials" style="display: flex; gap: 15px; font-size: 1rem;">
+                            <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: var(--text-muted);"><i class="fab fa-facebook"></i></a>
+                            <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: var(--text-muted);"><i class="fab fa-instagram"></i></a>
+                            <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: var(--text-muted);"><i class="fab fa-linkedin"></i></a>
+                            <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: var(--text-muted);"><i class="fab fa-whatsapp"></i></a>
+                        </div>
+                    </div>
+                </footer>
             </div>
 
             <!-- Profile View -->
@@ -862,25 +936,6 @@
                 </div>
             </div>
 
-            <!-- Footer -->
-            <footer style="margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--nexus-border);">
-                <div class="footer-content" style="max-width: 100%; padding: 0;">
-                    <div class="footer-brand">
-                        <div class="copyright">NEXUS © 2026 Nexus Works. All rights reserved.</div>
-                    </div>
-                    <div class="footer-links" style="gap: 20px;">
-                        <a href="${pageContext.request.contextPath}/">Home</a>
-                        <a href="${pageContext.request.contextPath}/about">About</a>
-                        <a href="${pageContext.request.contextPath}/contact">Contact</a>
-                    </div>
-                    <div class="footer-socials" style="display: flex; gap: 15px; font-size: 1rem;">
-                        <a href="<%= siteSettings.getOrDefault("social_facebook", "#") %>" target="_blank" title="Facebook" style="color: var(--text-muted);"><i class="fab fa-facebook"></i></a>
-                        <a href="<%= siteSettings.getOrDefault("social_instagram", "#") %>" target="_blank" title="Instagram" style="color: var(--text-muted);"><i class="fab fa-instagram"></i></a>
-                        <a href="<%= siteSettings.getOrDefault("social_linkedin", "#") %>" target="_blank" title="LinkedIn" style="color: var(--text-muted);"><i class="fab fa-linkedin"></i></a>
-                        <a href="<%= siteSettings.getOrDefault("social_whatsapp", "#") %>" target="_blank" title="WhatsApp" style="color: var(--text-muted);"><i class="fab fa-whatsapp"></i></a>
-                    </div>
-                </div>
-            </footer>
         </main>
     </div>
 

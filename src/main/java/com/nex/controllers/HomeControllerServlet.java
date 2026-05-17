@@ -13,7 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 @WebServlet({"/home", ""})
-public class HomeController extends HttpServlet {
+public class HomeControllerServlet extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
     private SettingsDAO settingsDAO;
